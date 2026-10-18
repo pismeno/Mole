@@ -396,55 +396,131 @@ Result<vk::raii::ImageView> VulkanMaterialHandler::create_texture_image_view(vk:
 Result<void> VulkanMaterialHandler::prepare_materials(std::vector<MaterialID> material_ids) {
   if (material_ids.empty()) return mole::ok();
 
-  update_texture_buffer();
-
-  std::vector<MaterialID> to_prepare;
-  to_prepare.reserve(material_ids.size());
+  std::vector<MaterialID> to_upload;
+  to_upload.reserve(material_ids.size());
+  std::vector<MaterialID> to_update;
+  to_update.reserve(material_ids.size());
 
   for (MaterialID material_id : material_ids) {
     auto it = allocated_materials.find(material_id);
     if (it == allocated_materials.end()) {
-      to_prepare.push_back(material_id);
+      to_upload.push_back(material_id);
     } else {
-      it->second.last_used_on_frame = frames_rendered.count;
-    }
-  }
-
-  std::byte* gpu_dest = static_cast<std::byte*>(material_buffer_mapped);
-
-  for (MaterialID mat_id : to_prepare) {
-    // Increase texture references
-    const Material& material = material_pool->get(mat_id);
-    for (auto& [name, property] : material.properties) {
-      if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
-        add_texture_reference(texture->get_packed_id());
+      GpuMaterial& gpu_material = it->second;
+      gpu_material.last_used_on_frame = frames_rendered.count;
+      uint32_t version = material_pool->get_version(material_id);
+      if (gpu_material.version != version) {
+        to_update.push_back(material_id);
       }
     }
-
-    auto r_packed = packed_material_cache->get(mat_id);
-    if (!r_packed) return mole::fail(r_packed.error());
-    const PackedMaterial& packed_material = r_packed.value();
-
-    if (packed_material.data.empty()) continue;
-
-    if (packed_material.data.size() > MATERIAL_STRIDE) {
-      return mole::fail("Packed material data is too large for VulkanMaterialHandler, it exceeds " + std::to_string(MATERIAL_STRIDE) + " bytes");
-    }
-
-    uint32_t slot_index = make_material_index();
-    uint32_t shader_index = (slot_index * static_cast<uint32_t>(MATERIAL_STRIDE)) / static_cast<uint32_t>(packed_material.data.size());
-
-    // Store both slot, shader index, and frame count in the map!
-    allocated_materials[mat_id] = {
-        .slot_index = slot_index,
-        .shader_index = shader_index,
-        .last_used_on_frame = frames_rendered.count
-    };
-
-    std::byte* target_address = gpu_dest + (slot_index * MATERIAL_STRIDE);
-    std::memset(target_address, 0, MATERIAL_STRIDE);
-    std::memcpy(target_address, packed_material.data.data(), packed_material.data.size());
   }
+
+  for (MaterialID mat_id : to_upload) {
+    auto r_upload = upload_material(mat_id);
+    if (!r_upload) return r_upload;
+  }
+
+  for (MaterialID mat_id : to_update) {
+    auto r_update = update_material(mat_id);
+    if (!r_update) return r_update;
+  }
+
+  auto r_update_texture_buffer = update_texture_buffer();
+  if (!r_update_texture_buffer) return r_update_texture_buffer;
+
+  return mole::ok();
+}
+
+Result<void> VulkanMaterialHandler::upload_material(const MaterialID& material_id) {
+  std::byte* gpu_dest = static_cast<std::byte*>(material_buffer_mapped);
+
+  // Increase texture references
+  std::vector<uint64_t> texture_ids;
+  const Material& material = material_pool->get(material_id);
+  for (auto& [name, property] : material.properties) {
+    if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
+      uint64_t tex_id = texture->get_packed_id();
+      add_texture_reference(tex_id);
+      texture_ids.push_back(tex_id);
+    }
+  }
+
+  auto r_packed = packed_material_cache->get(material_id);
+  if (!r_packed) return mole::fail(r_packed.error());
+  const PackedMaterial& packed_material = r_packed.value();
+
+  if (packed_material.data.empty()) return mole::ok();
+
+  if (packed_material.data.size() > MATERIAL_STRIDE) {
+    return mole::fail("Packed material data is too large for VulkanMaterialHandler, it exceeds " + std::to_string(MATERIAL_STRIDE) + " bytes");
+  }
+
+  uint32_t slot_index = make_material_index();
+  uint32_t shader_index = (slot_index * static_cast<uint32_t>(MATERIAL_STRIDE)) / static_cast<uint32_t>(packed_material.data.size());
+
+  // Store slot, shader index, frame count, version, and texture references in the map!
+  allocated_materials[material_id] = {
+      .slot_index = slot_index,
+      .shader_index = shader_index,
+      .last_used_on_frame = frames_rendered.count,
+      .version = material_pool->get_version(material_id),
+      .texture_ids = std::move(texture_ids)
+  };
+
+  std::byte* target_address = gpu_dest + (slot_index * MATERIAL_STRIDE);
+  std::memset(target_address, 0, MATERIAL_STRIDE);
+  std::memcpy(target_address, packed_material.data.data(), packed_material.data.size());
+
+  return mole::ok();
+}
+
+Result<void> VulkanMaterialHandler::update_material(const MaterialID& material_id) {
+  std::byte* gpu_dest = static_cast<std::byte*>(material_buffer_mapped);
+
+  auto it = allocated_materials.find(material_id);
+  if (it == allocated_materials.end()) {
+    return mole::fail("Material ID not found in allocated materials for update");
+  }
+  GpuMaterial& gpu_material = it->second;
+  uint32_t slot_index = gpu_material.slot_index;
+
+  std::vector<uint64_t> new_texture_ids;
+  const Material& material = material_pool->get(material_id);
+  for (auto& [name, property] : material.properties) {
+    if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
+      new_texture_ids.push_back(texture->get_packed_id());
+    }
+  }
+
+  for (uint64_t tex_id : new_texture_ids) {
+    add_texture_reference(tex_id);
+  }
+
+  for (uint64_t old_tex_id : gpu_material.texture_ids) {
+    remove_texture_reference(old_tex_id);
+  }
+
+  gpu_material.texture_ids = std::move(new_texture_ids);
+
+  auto r_packed = packed_material_cache->get(material_id);
+  if (!r_packed) return mole::fail(r_packed.error());
+  const PackedMaterial& packed_material = r_packed.value();
+
+  if (packed_material.data.empty()) return mole::ok();
+
+  if (packed_material.data.size() > MATERIAL_STRIDE) {
+    return mole::fail("Packed material data is too large for VulkanMaterialHandler, it exceeds " + std::to_string(MATERIAL_STRIDE) + " bytes");
+  }
+
+  uint32_t shader_index = (slot_index * static_cast<uint32_t>(MATERIAL_STRIDE)) / static_cast<uint32_t>(packed_material.data.size());
+
+  gpu_material.shader_index = shader_index;
+  gpu_material.last_used_on_frame = frames_rendered.count;
+  gpu_material.version = material_pool->get_version(material_id);
+
+  std::byte* target_address = gpu_dest + (slot_index * MATERIAL_STRIDE);
+  std::memset(target_address, 0, MATERIAL_STRIDE);
+  std::memcpy(target_address, packed_material.data.data(), packed_material.data.size());
 
   return mole::ok();
 }
@@ -467,15 +543,12 @@ void VulkanMaterialHandler::free_material(const MaterialID& material_id) {
   if (it != allocated_materials.end()) {
     uint32_t slot_index = it->second.slot_index;
 
+    for (uint64_t texture_id : it->second.texture_ids) {
+      remove_texture_reference(texture_id);
+    }
+
     recycled_material_indices.push_back(slot_index);
     allocated_materials.erase(it);
-  }
-
-  const Material& material = material_pool->get(material_id);
-  for (auto& [name, property] : material.properties) {
-    if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
-      remove_texture_reference(texture->get_packed_id());
-    }
   }
 }
 

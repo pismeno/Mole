@@ -240,6 +240,11 @@ Result<void> Editor::run() {
     auto r_move_to_mouse =  transform_manager->set_node_position(root_node, { inputs.get_mouse_x() / PPU, inputs.get_mouse_y() / PPU });
     if (!r_move_to_mouse) return r_move_to_mouse;
 
+    if (inputs.is_key_pressed(KeyCode::M)) {
+      material_pool->set_property(test_mat_id2, "tint", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+      std::cout << "pressed M";
+    }
+
     view_data.projection = glm::ortho(0.0f, world_width, world_height, 0.0f, -1.0f, 1.0f);
     view_data.view = glm::mat4(1.0f);
     view_data.viewProjection = view_data.projection * view_data.view;

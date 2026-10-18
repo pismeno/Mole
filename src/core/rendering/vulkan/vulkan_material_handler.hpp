@@ -60,6 +60,8 @@ class VulkanMaterialHandler {
     uint32_t slot_index;
     uint32_t shader_index;
     uint64_t last_used_on_frame;
+    uint32_t version;
+    std::vector<uint64_t> texture_ids;
   };
 
   Result<void> create_descriptor_set_layouts();
@@ -70,11 +72,14 @@ class VulkanMaterialHandler {
   Result<void> create_material_buffer();
 
   /// Allocates a primary command buffer from command_pool and begins it with eOneTimeSubmit.
-  [[nodiscard]] Result<vk::raii::CommandBuffer> allocate_upload_command_buffer();
+  Result<vk::raii::CommandBuffer> allocate_upload_command_buffer();
   /// Creates a 2D optimal tiled image via VMA with dedicated allocation.
-  [[nodiscard]] Result<vma::raii::Image> create_texture_image(const AssetHandle<ImageAsset>& asset);
+  Result<vma::raii::Image> create_texture_image(const AssetHandle<ImageAsset>& asset);
   /// Creates a standard 2D color aspect image view for the uploaded texture.
-  [[nodiscard]] Result<vk::raii::ImageView> create_texture_image_view(vk::Image image);
+  Result<vk::raii::ImageView> create_texture_image_view(vk::Image image);
+
+  Result<void> upload_material(const MaterialID& material_id);
+  Result<void> update_material(const MaterialID& material_id);
 
   uint32_t make_material_index();
 
