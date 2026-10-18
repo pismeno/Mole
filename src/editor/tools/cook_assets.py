@@ -4,6 +4,7 @@ from typing import BinaryIO
 import argparse
 import json
 import struct
+import os
 
 from utils.assets import AssetType, cooking, get_meta_file_path
 
@@ -79,10 +80,11 @@ for file_path_str in args.files:
                 continue
 
             dst_path = args.destination / (cooked_asset['uuid'] + ".asset")
+            dst_tmp_path = dst_path.with_name(dst_path.name + ".tmp")
 
             args.destination.mkdir(parents=True, exist_ok=True)
 
-            with open(dst_path, "wb") as f_out:
+            with open(dst_tmp_path, "wb") as f_out:
                 
                 # Write dummy bytes to reserve space for the header
                 f_out.write(b'\x00' * HEADER_SIZE)
@@ -94,3 +96,5 @@ for file_path_str in args.files:
                 # Go back to the very beginning of the file and write the real header
                 f_out.seek(0)
                 write_asset_header(f_out, asset_type, payload_size)
+
+            os.replace(dst_tmp_path, dst_path)
