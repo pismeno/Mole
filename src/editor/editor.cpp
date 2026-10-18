@@ -101,7 +101,7 @@ Result<void> Editor::init() {
   project_manager = std::make_unique<ProjectManager>(context);
   context.project_manager = project_manager.get();
 
-  auto r_create_project = project_manager->create_project({"test_project"});
+  auto r_create_project = project_manager->create_project({"test_project", context});
   if (!r_create_project) return r_create_project;
 
   auto r_get_scene_defs = asset_manager->acquire<TextAsset>(UUID::from_string("83ff4a11-e2af-4609-8c97-9c5b5b508dcb"));

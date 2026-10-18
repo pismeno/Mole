@@ -2,13 +2,16 @@
 
 #include <memory>
 
-#include "osal/ifile_system.hpp"
 #include "utils/result.hpp"
+#include "file_watcher.hpp"
+#include "editor/editor_context.hpp"
 
 namespace mole {
 
 struct ProjectOptions {
   std::string name;
+
+  const EditorContext& context;
 };
 
 class Project {
@@ -22,6 +25,8 @@ class Project {
   explicit Project() = default;
 
   std::string name;
+
+  std::unique_ptr<FileWatcher> assets_file_watcher;
 };
 
 } // mole

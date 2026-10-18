@@ -13,7 +13,7 @@ class ProjectManager {
   : file_system(context.os_context->file_system) {}
   ~ProjectManager() = default;
 
-  Result<void> create_project(const ProjectOptions options);
+  Result<void> create_project(const ProjectOptions& options);
  private:
   std::unique_ptr<Project> active_project;
 

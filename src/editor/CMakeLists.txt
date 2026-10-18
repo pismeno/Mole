@@ -6,11 +6,13 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/editor_context.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/project.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/project_manager.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/file_watcher.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/editor.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/project.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/project_manager.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/file_watcher.cpp
 )
 
 target_link_libraries(MoleEditor
@@ -19,7 +21,10 @@ target_link_libraries(MoleEditor
         glfw
 )
 
-target_include_directories(MoleEditor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(MoleEditor
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+        PRIVATE ${CMAKE_SOURCE_DIR}/external/watcher/include
+)
 
 if(APPLE)
     target_link_libraries(MoleEditor
@@ -29,6 +34,8 @@ if(APPLE)
             "-framework Metal"
             "-framework MetalKit"
             "-framework CoreGraphics"
+            "-framework CoreFoundation"
+            "-framework CoreServices"
     )
 
     target_include_directories(MoleEditor PRIVATE
