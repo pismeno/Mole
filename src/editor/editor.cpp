@@ -29,7 +29,6 @@ Result<void> Editor::init() {
 
   file_system->mount("core", "../../../engine_data/core");
   file_system->mount("editor", "../../../engine_data/editor");
-  file_system->mount("project_cache", "../../../project_cache");
 
   glslang::InitializeProcess();
 
@@ -77,18 +76,6 @@ Result<void> Editor::init() {
   scene_factory->register_manager<TransformManager>();
   scene_factory->register_manager<DrawableManager>();
 
-  auto r_get_scene_defs = asset_manager->acquire<TextAsset>(UUID::from_string("83ff4a11-e2af-4609-8c97-9c5b5b508dcb"));
-  if (!r_get_scene_defs) return mole::fail(r_get_scene_defs.error());
-  AssetHandle<TextAsset> scene_defs = std::move(r_get_scene_defs).value();
-  auto r_get_node_defs = asset_manager->acquire<TextAsset>(UUID::from_string("f29fc194-ac5b-4c7e-975e-05b6e4fe971a"));
-  if (!r_get_node_defs) return mole::fail(r_get_node_defs.error());
-  AssetHandle<TextAsset> node_defs = std::move(r_get_node_defs).value();
-
-  auto r_load_scene_defs = scene_factory->load_scene_definitions_from(scene_defs->as_string_view());
-  if (!r_load_scene_defs) return mole::fail(r_load_scene_defs.error());
-  auto r_load_node_defs = scene_factory->load_node_definitions_from(node_defs->as_string_view());
-  if (!r_load_node_defs) return mole::fail(r_load_node_defs.error());
-
   rendering_context = {
       .resources_context = &resources_context
   };
@@ -108,8 +95,26 @@ Result<void> Editor::init() {
       .node_system_context = &node_system_context,
       .rendering_context = &rendering_context,
       .os_context = &os_context,
-      .resources_context = &resources_context
+      .resources_context = &resources_context,
   };
+
+  project_manager = std::make_unique<ProjectManager>(context);
+  context.project_manager = project_manager.get();
+
+  auto r_create_project = project_manager->create_project({"test_project"});
+  if (!r_create_project) return r_create_project;
+
+  auto r_get_scene_defs = asset_manager->acquire<TextAsset>(UUID::from_string("83ff4a11-e2af-4609-8c97-9c5b5b508dcb"));
+  if (!r_get_scene_defs) return mole::fail(r_get_scene_defs.error());
+  AssetHandle<TextAsset> scene_defs = std::move(r_get_scene_defs).value();
+  auto r_get_node_defs = asset_manager->acquire<TextAsset>(UUID::from_string("f29fc194-ac5b-4c7e-975e-05b6e4fe971a"));
+  if (!r_get_node_defs) return mole::fail(r_get_node_defs.error());
+  AssetHandle<TextAsset> node_defs = std::move(r_get_node_defs).value();
+
+  auto r_load_scene_defs = scene_factory->load_scene_definitions_from(scene_defs->as_string_view());
+  if (!r_load_scene_defs) return mole::fail(r_load_scene_defs.error());
+  auto r_load_node_defs = scene_factory->load_node_definitions_from(node_defs->as_string_view());
+  if (!r_load_node_defs) return mole::fail(r_load_node_defs.error());
 
   auto r_get_texture = asset_manager->acquire<ImageAsset>(UUID::from_string("fd311be5-2c22-47c3-8296-2d35bb926ae7"));
   if (!r_get_texture) return mole::fail(r_get_texture.error());
@@ -228,6 +233,7 @@ Result<void> Editor::run() {
   while (!window->should_close()) {
     mole::ViewData view_data{};
 
+    window->update();
 
     float width = static_cast<float>(window->get_framebuffer_width());
     float height = static_cast<float>(window->get_framebuffer_height());
@@ -242,14 +248,16 @@ Result<void> Editor::run() {
 
     if (inputs.is_key_pressed(KeyCode::M)) {
       material_pool->set_property(test_mat_id2, "tint", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
-      std::cout << "pressed M";
+    }
+
+    if (inputs.is_key_released(KeyCode::M)) {
+      material_pool->set_property(test_mat_id2, "tint", glm::vec4(0.0f, 1.0f, 1.0f, 1.0f));
     }
 
     view_data.projection = glm::ortho(0.0f, world_width, world_height, 0.0f, -1.0f, 1.0f);
     view_data.view = glm::mat4(1.0f);
     view_data.viewProjection = view_data.projection * view_data.view;
 
-    window->update();
     scene->update();
 
     renderer->begin_frame();
@@ -261,6 +269,7 @@ Result<void> Editor::run() {
     renderer->end_frame();
 
     scene->end_frame();
+    inputs.end_frame();
 
     if (renderer->needs_framebuffer_resize()) {
       auto r_resize_framebuffer = renderer->resize_framebuffer(

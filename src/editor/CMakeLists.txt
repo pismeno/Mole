@@ -4,9 +4,13 @@ target_sources(MoleEditor
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/editor.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/editor_context.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/project.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/project_manager.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/editor.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/project.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/project_manager.cpp
 )
 
 target_link_libraries(MoleEditor

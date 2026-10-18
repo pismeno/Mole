@@ -30,7 +30,7 @@ class AssetManager {
   template <std::derived_from<Asset> T, typename... Args>
   Result<AssetHandle<T>> acquire(UUID uuid) {
 
-    auto r_asset_header = read_asset_header("project_cache://assets/" + uuid.to_string() + ".asset");
+    auto r_asset_header = read_asset_header("assets://" + uuid.to_string() + ".asset");
     if (!r_asset_header) {
       return mole::fail(r_asset_header.error());
     };

@@ -30,7 +30,7 @@ class AssetPool : public IAssetPool {
       return AssetHandle<T>(this, index, generations[index]);
     }
 
-    std::string filepath = "project_cache://assets/" + uuid.to_string() + ".asset";
+    std::string filepath = "assets://" + uuid.to_string() + ".asset";
 
     auto r_file_size = file_system->get_file_size(filepath);
     if (!r_file_size) {
