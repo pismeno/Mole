@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <mutex>
 #include <memory>
+#include <chrono>
+#include <unordered_map>
 
 #include <wtr/watcher.hpp>
 
@@ -39,11 +41,17 @@ class FileWatcher {
   void start();
   void push_event(std::filesystem::path path, FileWatchEventType type);
 
+  struct PendingEvent {
+    FileWatchEventType type;
+    std::chrono::steady_clock::time_point last_event_time;
+  };
+
   std::filesystem::path watch_path;
 
   std::unique_ptr<wtr::watch> watcher;
   std::mutex mutex;
-  std::vector<FileWatchEvent> events;
+  std::unordered_map<std::filesystem::path, PendingEvent> pending_events;
+  static constexpr std::chrono::milliseconds debounce_delay{100};
 };
 
 } // mole

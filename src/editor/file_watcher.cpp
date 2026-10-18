@@ -32,14 +32,36 @@ void FileWatcher::start() {
 
 std::vector<FileWatchEvent> FileWatcher::poll_events() {
   std::lock_guard<std::mutex> lock(mutex);
-  std::vector<FileWatchEvent> events_to_process = std::move(events);
-  events.clear();
+  std::vector<FileWatchEvent> events_to_process;
+  auto now = std::chrono::steady_clock::now();
+
+  for (auto it = pending_events.begin(); it != pending_events.end();) {
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - it->second.last_event_time);
+    if (elapsed >= debounce_delay) {
+      events_to_process.push_back({it->first, it->second.type});
+      it = pending_events.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
   return events_to_process;
 }
 
 void FileWatcher::push_event(std::filesystem::path path, FileWatchEventType type) {
   std::lock_guard<std::mutex> lock(mutex);
-  events.push_back({std::move(path), type});
+
+  auto it = pending_events.find(path);
+  if (it != pending_events.end()) {
+    // Preserve Created status if follow-up modification arrives in the same burst
+    if (it->second.type == FileWatchEventType::Created && type == FileWatchEventType::Modified) {
+      it->second.last_event_time = std::chrono::steady_clock::now();
+      return;
+    }
+    it->second = {type, std::chrono::steady_clock::now()};
+  } else {
+    pending_events[std::move(path)] = {type, std::chrono::steady_clock::now()};
+  }
 }
 
 } // mole
