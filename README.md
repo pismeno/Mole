@@ -79,6 +79,7 @@ There's an abstract `IRenderer` class, which has different implementation, for n
 
 # Used libraries
 - nlohmann/json
+- e-dant/watcher
 - GLM
 - Vulkan
 - Metal
