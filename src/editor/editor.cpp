@@ -17,6 +17,8 @@
 #include <node_system/managers/transform_manager.hpp>
 #include <resources/asset_types.hpp>
 #include "resources/material_pool.hpp"
+#include "editor/subprocess.hpp"
+#include "editor/states/workspace_state.hpp"
 
 namespace mole {
 
@@ -98,11 +100,13 @@ Result<void> Editor::init() {
       .resources_context = &resources_context,
   };
 
-  project_manager = std::make_unique<ProjectManager>(context);
-  context.project_manager = project_manager.get();
+  auto r_create_project = Project::create({"test_project", "../../../test_project", context});
+  if (!r_create_project) return mole::fail(r_create_project.error());
+  std::unique_ptr<Project> project = std::move(r_create_project).value();
 
-  auto r_create_project = project_manager->create_project({"test_project", context});
-  if (!r_create_project) return r_create_project;
+  auto r_create_state = WorkspaceState::create(std::move(project), context);
+  if (!r_create_state) return mole::fail(r_create_state.error());
+  state = std::move(r_create_state).value();
 
   auto r_get_scene_defs = asset_manager->acquire<TextAsset>(UUID::from_string("83ff4a11-e2af-4609-8c97-9c5b5b508dcb"));
   if (!r_get_scene_defs) return mole::fail(r_get_scene_defs.error());
@@ -232,6 +236,8 @@ Result<void> Editor::run() {
   Inputs& inputs = window->get_inputs();
   while (!window->should_close()) {
     mole::ViewData view_data{};
+
+    state->update();
 
     window->update();
 

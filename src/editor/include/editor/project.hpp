@@ -10,6 +10,7 @@ namespace mole {
 
 struct ProjectOptions {
   std::string name;
+  std::filesystem::path location;
 
   const EditorContext& context;
 };
@@ -19,14 +20,14 @@ class Project {
   ~Project() = default;
 
   inline const std::string_view get_name() const { return name; }
+  inline const std::filesystem::path& get_location() const { return location; }
 
   static Result<std::unique_ptr<Project>> create(const ProjectOptions& options);
  private:
   explicit Project() = default;
 
   std::string name;
-
-  std::unique_ptr<FileWatcher> assets_file_watcher;
+  std::filesystem::path location;
 };
 
 } // mole

@@ -34,3 +34,6 @@
 [submodule "external/watcher"]
 	path = external/watcher
 	url = https://github.com/e-dant/watcher.git
+[submodule "external/reproc"]
+	path = external/reproc
+	url = https://github.com/daandemeyer/reproc.git
