@@ -21,6 +21,7 @@ class Subprocess {
   std::vector<std::string> poll_output();
 
   void stop();
+  void wait();
   bool is_running() const;
 
   static Result<std::unique_ptr<Subprocess>> create(const std::vector<std::string>& command);

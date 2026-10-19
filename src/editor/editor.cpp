@@ -16,6 +16,8 @@
 #include <node_system/managers/drawable_manager.hpp>
 #include <node_system/managers/transform_manager.hpp>
 #include <resources/asset_types.hpp>
+
+#include "editor/process_orchestrator.hpp"
 #include "resources/material_pool.hpp"
 #include "editor/subprocess.hpp"
 #include "editor/states/workspace_state.hpp"
@@ -93,11 +95,15 @@ Result<void> Editor::init() {
   packed_material_cache = std::make_unique<PackedMaterialCache>(rendering_context);
   rendering_context.packed_material_cache = packed_material_cache.get();
 
+  process_orchestrator = std::make_unique<ProcessOrchestrator>();
+
   context = {
       .node_system_context = &node_system_context,
       .rendering_context = &rendering_context,
       .os_context = &os_context,
       .resources_context = &resources_context,
+
+      .process_orchestrator = process_orchestrator.get()
   };
 
   auto r_create_project = Project::create({"test_project", "../../../test_project", context});
@@ -238,7 +244,7 @@ Result<void> Editor::run() {
     mole::ViewData view_data{};
 
     state->update();
-
+    process_orchestrator->update();
     window->update();
 
     float width = static_cast<float>(window->get_framebuffer_width());

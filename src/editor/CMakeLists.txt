@@ -9,6 +9,7 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/subprocess.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/states/ieditor_state.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/states/workspace_state.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/process_orchestrator.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/editor.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
@@ -16,6 +17,7 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/file_watcher.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/subprocess.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/states/workspace_state.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/process_orchestrator.cpp
 )
 
 target_link_libraries(MoleEditor

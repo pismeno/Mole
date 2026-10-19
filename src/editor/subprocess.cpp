@@ -117,6 +117,12 @@ void Subprocess::stop() {
   }
 }
 
+void Subprocess::wait() {
+  if (worker_thread.joinable()) {
+    worker_thread.join(); // Blocks until the OS process exits and the thread finishes
+  }
+}
+
 bool Subprocess::is_running() const {
   return running;
 }
