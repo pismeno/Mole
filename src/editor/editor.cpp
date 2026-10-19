@@ -1,6 +1,8 @@
 #include <editor/editor.hpp>
 
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -234,6 +236,23 @@ Result<void> Editor::run() {
     mole::ViewData view_data{};
 
     window->update();
+
+    if (window->is_minimized()) {
+      inputs.end_frame();
+      std::this_thread::sleep_for(std::chrono::milliseconds(16));
+      continue;
+    }
+
+    if (renderer->needs_framebuffer_resize()) {
+      auto r_resize_framebuffer = renderer->resize_framebuffer(
+          window->get_framebuffer_width(),
+          window->get_framebuffer_height()
+      );
+
+      if (!r_resize_framebuffer) {
+        return mole::fail(r_resize_framebuffer.error());
+      }
+    }
 
     float width = static_cast<float>(window->get_framebuffer_width());
     float height = static_cast<float>(window->get_framebuffer_height());

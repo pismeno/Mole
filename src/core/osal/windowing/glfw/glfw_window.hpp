@@ -29,6 +29,7 @@ class GlfwWindow : public IWindow {
   uint32_t get_framebuffer_height() const override;
   bool is_focused() const noexcept override;
   bool is_fullscreen() const noexcept override;
+  bool is_minimized() const noexcept override;
   void set_fullscreen(bool fullscreen) override;
   Inputs& get_inputs() override;
   void* get_native_handle() const override;

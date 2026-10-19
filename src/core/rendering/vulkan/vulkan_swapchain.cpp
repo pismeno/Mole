@@ -74,6 +74,9 @@ Result<void> VulkanSwapchain::create_swap_chain(VulkanContext& vk_context, uint3
   std::vector<vk::PresentModeKHR> availablePresentModes = modes_res.value;
 
   swap_chain_extent = choose_swap_extent(surface_capabilities, window_width, window_height);
+  if (swap_chain_extent.width == 0 || swap_chain_extent.height == 0) {
+    return mole::fail("Cannot create swapchain with zero extent");
+  }
   uint32_t minImageCount = choose_swap_min_image_count(surface_capabilities);
   swap_chain_surface_format = choose_swap_surface_format(available_formats);
 
@@ -137,6 +140,19 @@ Result<void> VulkanSwapchain::create_image_views(VulkanContext& vk_context) {
 }
 
 Result<void> VulkanSwapchain::recreate(VulkanContext& vk_context, uint32_t window_width, uint32_t window_height) {
+  if (window_width == 0 || window_height == 0) {
+    return mole::fail("Cannot recreate swapchain with zero dimensions");
+  }
+
+  const vk::raii::PhysicalDevice& physical_device = vk_context.get_physical_device();
+  const vk::raii::SurfaceKHR& surface = vk_context.get_surface();
+
+  auto caps_res = physical_device.getSurfaceCapabilitiesKHR(*surface);
+  if (caps_res.result != vk::Result::eSuccess) return mole::fail("Failed to get surface capabilities");
+  if (caps_res.value.currentExtent.width == 0 && caps_res.value.currentExtent.height == 0) {
+    return mole::fail("Cannot recreate swapchain while window is minimized");
+  }
+
   vk_context.get_logical_device().waitIdle();
 
   swap_chain_image_views.clear();

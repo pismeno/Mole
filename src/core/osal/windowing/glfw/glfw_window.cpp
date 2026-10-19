@@ -6,6 +6,7 @@
 
 #include "glfw_window.hpp"
 
+#include <algorithm>
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
@@ -112,6 +113,11 @@ bool GlfwWindow::is_fullscreen() const noexcept {
   return is_fullscreen_;
 }
 
+bool GlfwWindow::is_minimized() const noexcept {
+  if (!glfw_window) return false;
+  return glfwGetWindowAttrib(glfw_window, GLFW_ICONIFIED) != 0 || framebuffer_width == 0 || framebuffer_height == 0;
+}
+
 Inputs& GlfwWindow::get_inputs() {
   return inputs;
 }
@@ -133,22 +139,23 @@ void GlfwWindow::set_fullscreen(bool fullscreen) {
 }
 
 void GlfwWindow::window_resize_callback(GLFWwindow *window, int width, int height) {
-  if (width <= 0 || height <= 0) return;
+  if (width > 0 && height > 0) {
+    logical_width = static_cast<uint32_t>(width);
+    logical_height = static_cast<uint32_t>(height);
 
-  logical_width = static_cast<uint32_t>(width);
-  logical_height = static_cast<uint32_t>(height);
-
-  if (!is_fullscreen()) {
-    windowed_width = logical_width;
-    windowed_height = logical_height;
+    if (!is_fullscreen()) {
+      windowed_width = logical_width;
+      windowed_height = logical_height;
+    }
+  } else {
+    logical_width = 0;
+    logical_height = 0;
   }
 }
 
 void GlfwWindow::frame_buffer_resize_callback(GLFWwindow *window, int width, int height) {
-  if (width <= 0 || height <= 0) return;
-
-  framebuffer_width = static_cast<uint32_t>(width);
-  framebuffer_height = static_cast<uint32_t>(height);
+  framebuffer_width = width > 0 ? static_cast<uint32_t>(width) : 0;
+  framebuffer_height = height > 0 ? static_cast<uint32_t>(height) : 0;
 }
 
 void* GlfwWindow::get_native_handle() const {

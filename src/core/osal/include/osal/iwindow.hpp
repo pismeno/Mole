@@ -46,6 +46,7 @@ class IWindow {
   [[nodiscard]] virtual uint32_t get_framebuffer_height() const = 0;
   [[nodiscard]] virtual bool is_focused() const noexcept = 0;
   [[nodiscard]] virtual bool is_fullscreen() const noexcept = 0;
+  [[nodiscard]] virtual bool is_minimized() const noexcept = 0;
   virtual void set_fullscreen(bool fullscreen) = 0;
 
   /**

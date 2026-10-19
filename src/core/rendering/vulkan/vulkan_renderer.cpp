@@ -292,7 +292,11 @@ void VulkanRenderer::submit(const std::vector<RenderQuadCommand>& render_command
 }
 
 void VulkanRenderer::end_pass() {
-  if (needs_framebuffer_resize_ || is_context_lost_ || pending_commands.empty()) return;
+  if (needs_framebuffer_resize_ || is_context_lost_ || swapchain->get_extent().width == 0 || swapchain->get_extent().height == 0) {
+    pending_commands.clear();
+    return;
+  }
+  if (pending_commands.empty()) return;
 
   FrameData& frame = frames[current_frame_];
 
@@ -429,10 +433,28 @@ void VulkanRenderer::update_quad_ssbo(FrameData& frame) {
 }
 
 Result<void> VulkanRenderer::resize_framebuffer(uint32_t width, uint32_t height) {
+  if (width == 0 || height == 0) {
+    needs_framebuffer_resize_ = true;
+    return mole::ok();
+  }
+
+  const auto& physical_device = vk_context->get_physical_device();
+  const auto& surface = vk_context->get_surface();
+  auto caps_res = physical_device.getSurfaceCapabilitiesKHR(*surface);
+  if (caps_res.result == vk::Result::eSuccess) {
+    if (caps_res.value.currentExtent.width == 0 && caps_res.value.currentExtent.height == 0) {
+      needs_framebuffer_resize_ = true;
+      return mole::ok();
+    }
+  }
+
   vk_context->get_logical_device().waitIdle();
 
   auto r_recreate = swapchain->recreate(*vk_context, width, height);
-  if (!r_recreate) return r_recreate;
+  if (!r_recreate) {
+    needs_framebuffer_resize_ = true;
+    return r_recreate;
+  }
 
   render_finished_semaphores.clear();
   for (size_t i = 0; i < swapchain->get_image_count(); i++) {
