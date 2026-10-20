@@ -13,6 +13,7 @@ namespace mole {
 Result<std::unique_ptr<WorkspaceState>> WorkspaceState::create(std::unique_ptr<Project> project, const EditorContext& context) {
   std::unique_ptr<WorkspaceState> state(new WorkspaceState(std::move(project)));
 
+  state->project_assets = std::make_unique<ProjectAssets>(context);
   state->process_orchestrator = context.process_orchestrator;
   state->file_system = context.os_context->file_system;
 

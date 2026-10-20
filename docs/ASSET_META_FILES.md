@@ -8,12 +8,12 @@ Example structure:
 {
   "cooked_assets" : [
     {
-      "uuid" : 123456789,
-      "type" : "texture"
+      "uuid" : "123456789",
+      "type" : 0
     },
     {
-      "uuid" : 987654321,
-      "type" : "vertex_shader"
+      "uuid" : "987654321",
+      "type" : 7
     }
   ]
 }

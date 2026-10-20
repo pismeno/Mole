@@ -7,6 +7,7 @@ add_executable(MoleTests
         transform_manager_test.cpp
         material_pool_test.cpp
         material_packer_test.cpp
+        file_system_test.cpp
 )
 
 target_link_libraries(MoleTests

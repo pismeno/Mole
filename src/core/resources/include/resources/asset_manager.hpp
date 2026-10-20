@@ -27,7 +27,7 @@ class AssetManager {
   template <typename> friend class AssetHandle;
 
  public:
-  template <std::derived_from<Asset> T, typename... Args>
+  template <std::derived_from<Asset> T>
   Result<AssetHandle<T>> acquire(UUID uuid) {
 
     auto r_asset_header = read_asset_header("assets://" + uuid.to_string() + ".asset");

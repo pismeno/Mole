@@ -5,6 +5,7 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/editor.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/editor_context.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/project.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/project_assets.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/file_watcher.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/subprocess.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/states/ieditor_state.hpp
@@ -14,6 +15,7 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/editor.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/project.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/project_assets.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/file_watcher.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/subprocess.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/states/workspace_state.cpp

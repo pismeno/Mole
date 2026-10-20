@@ -112,6 +112,7 @@ Result<void> Editor::init() {
 
   auto r_create_state = WorkspaceState::create(std::move(project), context);
   if (!r_create_state) return mole::fail(r_create_state.error());
+  WorkspaceState* workspace_state = r_create_state.value().get();
   state = std::move(r_create_state).value();
 
   auto r_get_scene_defs = asset_manager->acquire<TextAsset>(UUID::from_string("83ff4a11-e2af-4609-8c97-9c5b5b508dcb"));
@@ -126,7 +127,9 @@ Result<void> Editor::init() {
   auto r_load_node_defs = scene_factory->load_node_definitions_from(node_defs->as_string_view());
   if (!r_load_node_defs) return mole::fail(r_load_node_defs.error());
 
-  auto r_get_texture = asset_manager->acquire<ImageAsset>(UUID::from_string("fd311be5-2c22-47c3-8296-2d35bb926ae7"));
+  auto r_res_uuid = workspace_state->get_project_assets().resolve("project://assets/test_img.png", AssetType::Image);
+  if (!r_res_uuid) return mole::fail(r_res_uuid.error());
+  auto r_get_texture = asset_manager->acquire<ImageAsset>(r_res_uuid.value());
   if (!r_get_texture) return mole::fail(r_get_texture.error());
   AssetHandle<ImageAsset> texture = std::move(r_get_texture).value();
   std::cout << bindless_texture_registry->get_index(texture) << " - Tex index" << std::endl;;
