@@ -49,6 +49,9 @@ class IFileSystem {
  */
   virtual Result<std::vector<uint8_t>> read_chunk(std::string_view virtual_path, uint64_t offset, uint64_t size) = 0;
 
+  virtual Result<void> remove(std::string_view virtual_path) = 0;
+  virtual Result<void> make_file(std::string_view virtual_path) = 0;
+
   virtual Result<bool> exists(std::string_view virtual_path) const = 0;
   virtual Result<bool> is_file(std::string_view virtual_path) const = 0;
   virtual Result<bool> is_dir(std::string_view virtual_path) const = 0;
