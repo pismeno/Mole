@@ -76,8 +76,49 @@ TEST_CASE("WindowsFileSystem: exists, is_file, and is_dir") {
     CHECK_FALSE(r_invalid_prefix.is_ok());
   }
 
+  SUBCASE("make_file checks") {
+    auto r_make = fs->make_file("test://created_file.txt");
+    REQUIRE(r_make.is_ok());
+
+    auto r_exists = fs->exists("test://created_file.txt");
+    REQUIRE(r_exists.is_ok());
+    CHECK(r_exists.value() == true);
+
+    auto r_is_f = fs->is_file("test://created_file.txt");
+    REQUIRE(r_is_f.is_ok());
+    CHECK(r_is_f.value() == true);
+
+    auto r_invalid_prefix = fs->make_file("unmounted://created_file.txt");
+    CHECK_FALSE(r_invalid_prefix.is_ok());
+  }
+
+  SUBCASE("remove checks") {
+    // Remove existing file
+    auto r_rem_file = fs->remove("test://test_file.txt");
+    REQUIRE(r_rem_file.is_ok());
+
+    auto r_exists = fs->exists("test://test_file.txt");
+    REQUIRE(r_exists.is_ok());
+    CHECK(r_exists.value() == false);
+
+    // Remove existing directory
+    auto r_rem_dir = fs->remove("test://subdir");
+    REQUIRE(r_rem_dir.is_ok());
+
+    auto r_dir_exists = fs->exists("test://subdir");
+    REQUIRE(r_dir_exists.is_ok());
+    CHECK(r_dir_exists.value() == false);
+
+    // Remove non-existent path
+    auto r_rem_missing = fs->remove("test://nonexistent_path");
+    CHECK_FALSE(r_rem_missing.is_ok());
+
+    // Remove with invalid prefix
+    auto r_invalid_prefix = fs->remove("unmounted://some_file.txt");
+    CHECK_FALSE(r_invalid_prefix.is_ok());
+  }
+
   // Cleanup
   std::error_code ec;
   std::filesystem::remove_all(temp_dir, ec);
 }
-

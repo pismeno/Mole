@@ -2,6 +2,8 @@
 
 #include <string_view>
 
+#include <nlohmann/json.hpp>
+
 #include "editor/editor_context.hpp"
 #include "osal/os_context.hpp"
 #include "osal/ifile_system.hpp"
@@ -20,9 +22,11 @@ public:
   template<std::derived_from<Asset> T>
   Result<UUID> resolve(std::string_view path) const { return resolve(path, T::ASSET_TYPE); }
   Result<UUID> resolve(std::string_view path, AssetType requested_type) const;
-  //Result<void> remove(std::string_view path) const;
-  //Result<void> make_file(std::string_view path) const;
+  Result<void> remove(std::string_view path) const;
+  Result<void> make_file(std::string_view path) const;
 private:
+  Result<nlohmann::json> read_meta_json(const std::string& asset_path) const;
+
   IFileSystem* file_system;
 };
 

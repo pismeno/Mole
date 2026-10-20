@@ -10,7 +10,7 @@ from utils.assets import AssetType, get_meta_file_path
 def append_type(processed_asset_list: list[dict], type: AssetType) -> None:
     processed_asset_list.append({
         "uuid" : str(uuid.uuid4()),
-        "type" : str(type)
+        "type" : int(type)
     })
 
 parser = argparse.ArgumentParser(

@@ -127,7 +127,7 @@ Result<void> Editor::init() {
   auto r_load_node_defs = scene_factory->load_node_definitions_from(node_defs->as_string_view());
   if (!r_load_node_defs) return mole::fail(r_load_node_defs.error());
 
-  auto r_res_uuid = workspace_state->get_project_assets().resolve("project://assets/test_img.png", AssetType::Image);
+  auto r_res_uuid = workspace_state->get_project_assets().resolve("test_img.png", AssetType::Image);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
   auto r_get_texture = asset_manager->acquire<ImageAsset>(r_res_uuid.value());
   if (!r_get_texture) return mole::fail(r_get_texture.error());
