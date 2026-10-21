@@ -21,6 +21,39 @@ Result<void> AssetManager::init(ResourcesContext& context) {
   return mole::ok();
 }
 
+void AssetManager::unload(UUID uuid) {
+  for (auto& [type, pool] : asset_pools) {
+    if (pool->contains(uuid)) {
+      pool->mark_missing(uuid);
+      return;
+    }
+  }
+}
+
+void AssetManager::unload(UUID uuid, AssetType type) {
+  auto it = asset_pools.find(type);
+  if (it != asset_pools.end()) {
+    it->second->mark_missing(uuid);
+  }
+}
+
+Result<void> AssetManager::reload(UUID uuid) {
+  for (auto& [type, pool] : asset_pools) {
+    if (pool->contains(uuid)) {
+      return pool->reload(uuid);
+    }
+  }
+  return mole::fail("Asset is not loaded in any active pool");
+}
+
+Result<void> AssetManager::reload(UUID uuid, AssetType type) {
+  auto it = asset_pools.find(type);
+  if (it == asset_pools.end()) {
+    return mole::fail("No pool found for asset type");
+  }
+  return it->second->reload(uuid);
+}
+
 Result<AssetHeader> AssetManager::read_asset_header(const std::string_view virtual_path) {
   auto r_chunk = file_system->read_chunk(virtual_path, 0, sizeof(AssetHeader));
   if (!r_chunk) {

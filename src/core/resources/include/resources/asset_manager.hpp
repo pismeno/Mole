@@ -43,8 +43,19 @@ class AssetManager {
     return get_pool<T>()->load(uuid);
   }
 
-  template <std::derived_from<Asset> T> void unload(UUID uuid) { get_pool<T>()->mark_missing(uuid); }
-  template <std::derived_from<Asset> T> Result<void> reload(UUID uuid) { return get_pool<T>()->reload(uuid); }
+  void unload(UUID uuid);
+  void unload(UUID uuid, AssetType type);
+  template <std::derived_from<Asset> T>
+  void unload(UUID uuid) {
+    unload(uuid, T::ASSET_TYPE);
+  }
+
+  Result<void> reload(UUID uuid);
+  Result<void> reload(UUID uuid, AssetType type);
+  template <std::derived_from<Asset> T>
+  Result<void> reload(UUID uuid) {
+    return reload(uuid, T::ASSET_TYPE);
+  }
 
   /**
    * @return Result containing a unique pointer to the created manager, or an error.

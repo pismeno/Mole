@@ -14,7 +14,15 @@
 
 namespace mole {
 
-class IAssetPool { public: virtual ~IAssetPool() = default; };
+class IAssetPool {
+ public:
+  virtual ~IAssetPool() = default;
+
+  virtual void mark_missing(UUID uuid) = 0;
+  virtual Result<void> reload(UUID uuid) = 0;
+  virtual bool contains(UUID uuid) const = 0;
+  virtual bool is_loaded(UUID uuid) const = 0;
+};
 
 template<typename T>
 class AssetPool : public IAssetPool {
@@ -54,7 +62,7 @@ class AssetPool : public IAssetPool {
     return AssetHandle<T>(this, index, assets[index].generation);
   }
 
-  Result<void> reload(UUID uuid) {
+  Result<void> reload(UUID uuid) override {
     auto it = cache.find(uuid);
     if (it == cache.end()) {
       return mole::fail("Asset not found");
@@ -68,6 +76,7 @@ class AssetPool : public IAssetPool {
       return mole::fail(r_asset.error());
     }
     assets[index].asset = std::move(r_asset).value();
+    return mole::ok();
   }
 
   Result<T> load_asset_from_file(UUID uuid) {
@@ -90,7 +99,7 @@ class AssetPool : public IAssetPool {
     return parse_asset(filepath, std::move(r_read_bytes).value());
   }
 
-  void mark_missing(UUID uuid) {
+  void mark_missing(UUID uuid) override {
     auto it = cache.find(uuid);
     if (it != cache.end()) {
       uint32_t index = it->second;
@@ -126,7 +135,11 @@ class AssetPool : public IAssetPool {
     }
   }
 
-  bool is_loaded(UUID uuid) const {
+  bool contains(UUID uuid) const override {
+    return cache.contains(uuid);
+  }
+
+  bool is_loaded(UUID uuid) const override {
     auto it = cache.find(uuid);
     if (it == cache.end()) return false;
 
