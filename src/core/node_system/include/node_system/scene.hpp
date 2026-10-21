@@ -35,9 +35,9 @@ class Scene {
 
   [[nodiscard]] bool is_node_valid(const NodeID node_id) const noexcept;
   const NodeID get_nodes_parent(const NodeID node_id) const noexcept;
-  const std::vector<NodeID>& get_nodes_children(const NodeID node_id) const noexcept;
+  std::vector<NodeID> get_nodes_children(const NodeID node_id) const noexcept;
 
-  [[nodiscard]] const NodeID create_node(NodeID parent_id, std::string_view node_type);
+  [[nodiscard]] NodeID create_node(NodeID parent_id, std::string_view node_type);
   void destroy_node(NodeID node_id);
   void reparent_node(NodeID node_id, NodeID new_parent_id);
 

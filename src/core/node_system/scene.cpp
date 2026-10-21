@@ -45,13 +45,13 @@ namespace mole {
   return nodes[node_id.index()].parent_id;
 }
 
-[[nodiscard]] const std::vector<NodeID>& Scene::get_nodes_children(NodeID node_id) const noexcept {
+[[nodiscard]] std::vector<NodeID> Scene::get_nodes_children(NodeID node_id) const noexcept {
   if (!is_node_valid(node_id)) return {};
 
   return nodes[node_id.index()].children_ids;
 }
 
-[[nodiscard]] const NodeID Scene::create_node(NodeID parent_id, std::string_view node_type) {
+[[nodiscard]] NodeID Scene::create_node(NodeID parent_id, std::string_view node_type) {
   NodeID new_id = generate_id();
 
   nodes[new_id.index()].id = new_id;
