@@ -24,8 +24,8 @@ class AssetHandle {
   [[nodiscard]] bool is_valid() const noexcept;
   explicit operator bool() const noexcept { return is_valid(); }
 
-  [[nodiscard]] const T* get() const noexcept;
-  const T* operator->() const noexcept { return get(); }
+  [[nodiscard]] const T& get() const noexcept;
+  const T* operator->() const noexcept { return &get(); }
 
   bool operator==(const AssetHandle& other) const {
     return index == other.index && generation == other.generation && pool == other.pool;

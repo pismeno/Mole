@@ -26,10 +26,51 @@ class AssetPool : public IAssetPool {
     auto it = cache.find(uuid);
     if (it != cache.end()) {
       uint32_t index = it->second;
-      ref_counts[index]++;
-      return AssetHandle<T>(this, index, generations[index]);
+      assets[index].ref_count++;
+      return AssetHandle<T>(this, index, assets[index].generation);
     }
 
+    auto r_asset = load_asset_from_file(uuid);
+    if (!r_asset) {
+      return mole::fail(r_asset.error());
+    }
+
+    // I/O succeeded: now acquire/allocate an index safely
+    uint32_t index;
+    if (!free_indices.empty()) {
+      index = free_indices.back();
+      free_indices.pop_back();
+    } else {
+      index = static_cast<uint32_t>(assets.size());
+      assets.emplace_back();
+      uuids.emplace_back();
+    }
+
+    assets[index].asset = std::move(r_asset).value();
+    uuids[index] = uuid;
+    cache.try_emplace(uuids[index], index);
+    assets[index].ref_count = 1;
+
+    return AssetHandle<T>(this, index, assets[index].generation);
+  }
+
+  Result<void> reload(UUID uuid) {
+    auto it = cache.find(uuid);
+    if (it == cache.end()) {
+      return mole::fail("Asset not found");
+    }
+
+    uint32_t index = it->second;
+
+    auto r_asset = load_asset_from_file(uuid);
+    if (!r_asset) {
+      assets[index].state = AssetState::MissingOnDisk;
+      return mole::fail(r_asset.error());
+    }
+    assets[index].asset = std::move(r_asset).value();
+  }
+
+  Result<T> load_asset_from_file(UUID uuid) {
     std::string filepath = "assets://" + uuid.to_string() + ".asset";
 
     auto r_file_size = file_system->get_file_size(filepath);
@@ -46,55 +87,57 @@ class AssetPool : public IAssetPool {
       return mole::fail(r_read_bytes.error());
     }
 
-    auto r_asset = parse_asset(filepath, std::move(r_read_bytes).value());
-    if (!r_asset) {
-      return mole::fail(r_asset.error());
-    }
-
-    // I/O succeeded: now acquire/allocate an index safely
-    uint32_t index;
-    if (!free_indices.empty()) {
-      index = free_indices.back();
-      free_indices.pop_back();
-    } else {
-      index = static_cast<uint32_t>(data.size());
-      data.emplace_back();
-      generations.push_back(1);
-      ref_counts.push_back(0);
-      filepaths.emplace_back();
-    }
-
-    data[index] = std::move(r_asset).value();
-    filepaths[index] = uuid;
-    cache.try_emplace(filepaths[index], index);
-    ref_counts[index] = 1;
-
-    return AssetHandle<T>(this, index, generations[index]);
+    return parse_asset(filepath, std::move(r_read_bytes).value());
   }
 
-  T *resolve(uint32_t index, uint32_t generation) {
-    if (index >= data.size()) return nullptr;
-    if (generations[index] != generation) return nullptr;
-    return &data[index];
+  void mark_missing(UUID uuid) {
+    auto it = cache.find(uuid);
+    if (it != cache.end()) {
+      uint32_t index = it->second;
+      assets[index].state = AssetState::MissingOnDisk;
+      assets[index].asset = T{};
+    }
+  }
+
+  const T& resolve(uint32_t index, uint32_t generation) {
+    if (index >= assets.size()) return fallback_asset;
+    if (assets[index].generation != generation) return fallback_asset;
+    if (assets[index].state == AssetState::MissingOnDisk) return fallback_asset;
+    return assets[index].asset;
   }
 
   void add_ref(uint32_t index, uint32_t generation) {
-    if (index < data.size() && generations[index] == generation) {
-      ref_counts[index]++;
+    if (index < assets.size() && assets[index].generation == generation) {
+      assets[index].ref_count++;
     }
   }
 
   void release(uint32_t index, uint32_t generation) {
-    if (index >= data.size() || generations[index] != generation) return;
+    if (index >= assets.size() || assets[index].generation != generation) return;
 
-    ref_counts[index]--;
+    assets[index].ref_count--;
 
-    if (ref_counts[index] == 0) {
-      cache.erase(filepaths[index]);
-      data[index] = T{};
-      generations[index]++;
+    if (assets[index].ref_count == 0) {
+      cache.erase(uuids[index]);
+      assets[index].asset = T{};
+      assets[index].generation++;
+      assets[index].state = AssetState::Unloaded;
       free_indices.push_back(index);
     }
+  }
+
+  bool is_loaded(UUID uuid) const {
+    auto it = cache.find(uuid);
+    if (it == cache.end()) return false;
+
+    uint32_t index = it->second;
+    return assets[index].state == AssetState::Loaded;
+  }
+
+  bool is_loaded(uint32_t index, uint32_t generation) const {
+    if (index >= assets.size()) return false;
+    if (assets[index].generation != generation) return false;
+    return assets[index].state == AssetState::Loaded;
   }
 
  protected:
@@ -102,10 +145,23 @@ class AssetPool : public IAssetPool {
   Result<T> parse_asset(std::string_view filepath, std::vector<uint8_t> raw_bytes);
 
  private:
-  std::vector<T> data;
-  std::vector<uint32_t> generations;
-  std::vector<uint32_t> ref_counts;
-  std::vector<UUID> filepaths;
+  enum class AssetState {
+    Loaded,
+    MissingOnDisk,
+    Unloaded,
+  };
+
+  struct AssetSlot {
+    T asset;
+    uint32_t generation = 1;
+    uint32_t ref_count = 0;
+    AssetState state = AssetState::Loaded;
+  };
+
+  std::vector<AssetSlot> assets;
+  T fallback_asset = T::FALLBACK;
+
+  std::vector<UUID> uuids;
   std::vector<uint32_t> free_indices;
   std::unordered_map<UUID, uint32_t> cache;
 

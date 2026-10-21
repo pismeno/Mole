@@ -56,12 +56,11 @@ AssetHandle<T>& AssetHandle<T>::operator=(AssetHandle&& other) noexcept {
 template<typename T>
 bool AssetHandle<T>::is_valid() const noexcept {
   if (!pool || index == std::numeric_limits<uint32_t>::max()) return false;
-  return pool->resolve(index, generation) != nullptr;
+  return pool->is_loaded(index, generation);
 }
 
 template<typename T>
-const T* AssetHandle<T>::get() const noexcept {
-  if (!pool) return nullptr;
+const T& AssetHandle<T>::get() const noexcept {
   return pool->resolve(index, generation);
 }
 
