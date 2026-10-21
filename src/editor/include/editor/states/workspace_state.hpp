@@ -10,6 +10,7 @@
 #include "editor/subprocess.hpp"
 #include "editor/process_orchestrator.hpp"
 #include "editor/project_assets.hpp"
+#include "resources/asset_manager.hpp"
 
 namespace mole {
 
@@ -34,6 +35,7 @@ class WorkspaceState : public IEditorState {
   std::unique_ptr<FileWatcher> assets_file_watcher;
 
   IFileSystem* file_system;
+  AssetManager* asset_manager;
   ProcessOrchestrator* process_orchestrator;
 };
 

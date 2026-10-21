@@ -1,6 +1,7 @@
 #include "editor/project_assets.hpp"
 #include <filesystem>
 #include "resources/asset_types.hpp"
+#include "resources/asset_manager.hpp"
 
 namespace mole {
 
@@ -49,6 +50,26 @@ Result<UUID> ProjectAssets::resolve(std::string_view path, AssetType requested_t
   return mole::fail("Asset does not contain a cooked asset of the requested type");
 }
 
+Result<std::vector<UUID>> ProjectAssets::get_cooked_uuids(std::string_view path) const {
+  std::string asset_path = std::string("project://assets/").append(path);
+  auto r_json = read_meta_json(asset_path);
+  if (!r_json) return mole::fail(r_json.error());
+
+  const nlohmann::json& json = r_json.value();
+  auto cooked_assets_it = json.find("cooked_assets");
+  if (cooked_assets_it == json.end() || !cooked_assets_it->is_array()) {
+    return mole::fail("Asset's .meta file does not contain an array of cooked assets");
+  }
+
+  std::vector<UUID> uuids;
+  for (const auto& cooked_asset_recipe : *cooked_assets_it) {
+    if (!cooked_asset_recipe["uuid"].is_string()) continue;
+    uuids.push_back(UUID::from_string(cooked_asset_recipe["uuid"].get<std::string>()));
+  }
+
+  return uuids;
+}
+
 Result<void> ProjectAssets::remove(std::string_view path) const {
   std::string asset_path = std::string("project://assets/").append(path);
   auto r_is_file = file_system->is_file(asset_path);
@@ -67,6 +88,10 @@ Result<void> ProjectAssets::remove(std::string_view path) const {
         if (!cooked_asset_recipe["uuid"].is_string()) continue;
 
         UUID uuid = UUID::from_string(cooked_asset_recipe["uuid"].get<std::string>());
+
+        if (asset_manager) {
+          asset_manager->unload(uuid);
+        }
 
         auto r_remove_cooked = file_system->remove("assets://" + uuid.to_string() + ".asset");
         if (!r_remove_cooked) return mole::fail(r_remove_cooked.error());

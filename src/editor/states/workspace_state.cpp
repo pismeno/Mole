@@ -16,6 +16,7 @@ Result<std::unique_ptr<WorkspaceState>> WorkspaceState::create(std::unique_ptr<P
   state->project_assets = std::make_unique<ProjectAssets>(context);
   state->process_orchestrator = context.process_orchestrator;
   state->file_system = context.os_context->file_system;
+  state->asset_manager = context.resources_context->asset_manager;
 
   std::filesystem::path project_location = state->project->get_location();
   state->file_system->mount("project", project_location);
@@ -39,24 +40,60 @@ void WorkspaceState::update() {
   assert(r_resolve_cache && "Failed to resolve assets cache, which shouldve been mounted when creating WorkspaceState");
   std::filesystem::path cache_path = r_resolve_cache.value();
 
-  // 3. ONLY start the process if files actually changed
+  // ONLY start the process if files actually changed
   if (fw_events.empty()) return;
 
   std::vector<std::string> meta_files_command = {"../../tools/python/python.exe", "../../../src/editor/tools/gen_asset_meta_files.py"};
   std::vector<std::string> cook_command = {"../../tools/python/python.exe", "../../../src/editor/tools/cook_assets.py", cache_path.string()};
 
   bool files_added = false;
+  std::vector<std::string> cooked_relative_paths;
+
+  // Get the root location of the project to calculate relative paths
+  std::filesystem::path project_root = project->get_location();
+  std::filesystem::path assets_root = project_root / "assets"; // Compare against the assets folder
+
   for (const auto& fw_event : fw_events) {
     if (fw_event.type == FileWatchEventType::Deleted || fw_event.path.extension() == ".meta") continue;
 
-      meta_files_command.push_back(fw_event.path.string());
-      cook_command.push_back(fw_event.path.string());
-      files_added = true;
-    }
+    meta_files_command.push_back(fw_event.path.string());
+    cook_command.push_back(fw_event.path.string());
+
+    // 1. Strip the absolute path down to just the filename/subfolders (e.g., test.txt)
+    std::filesystem::path rel_path = std::filesystem::relative(fw_event.path, assets_root);
+
+    // 2. Pass just the relative path, since get_cooked_uuids is internally prepending the base assets path
+    std::string path_for_uuids = rel_path.generic_string();
+
+    cooked_relative_paths.push_back(path_for_uuids);
+    files_added = true;
+  }
 
   if (files_added) {
-    auto r_gen_meta_files_process = process_orchestrator->spawn(meta_files_command, [this, cook_command] {
-      auto r_cook_assets_process = process_orchestrator->spawn(cook_command);
+    // Capture cooked_relative_paths by value so the async callbacks can safely access it later
+    auto r_gen_meta_files_process = process_orchestrator->spawn(meta_files_command, [this, cook_command, cooked_relative_paths] {
+      auto r_cook_assets_process = process_orchestrator->spawn(cook_command, [this, cooked_relative_paths] {
+
+        // Loop through the paths for the assets we just cooked
+        for (const std::string& rel_path : cooked_relative_paths) {
+          auto r_get_cooked_uuids = project_assets->get_cooked_uuids(rel_path);
+
+          if (!r_get_cooked_uuids) {
+            std::cerr << "Failed to get cooked UUIDs for " << rel_path << ": " << r_get_cooked_uuids.error() << std::endl;
+            continue;
+          }
+
+          for (const UUID& uuid : r_get_cooked_uuids.value()) {
+            auto r_reload = asset_manager->reload(uuid);
+            if (!r_reload) {
+              std::cerr << "Failed to reload asset " << uuid.to_string() << ": " << r_reload.error() << std::endl;
+            } else {
+              std::cout << "Reloaded asset " << uuid.to_string() << std::endl;
+            }
+          }
+        }
+
+      });
       if (!r_cook_assets_process) {
         std::cerr << "Failed to start cook_assets_process" << std::endl;
       }
