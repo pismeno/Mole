@@ -3,16 +3,20 @@
 #include "editor/states/ieditor_state.hpp"
 
 #include <memory>
+#include <vector>
 
-#include "editor/project.hpp"
 #include "utils/result.hpp"
-#include "osal/ifile_system.hpp"
-#include "editor/subprocess.hpp"
-#include "editor/process_orchestrator.hpp"
-#include "editor/project_assets.hpp"
-#include "resources/asset_manager.hpp"
 
 namespace mole {
+
+struct EditorContext;
+class AssetManager;
+class FileWatcher;
+class IFileSystem;
+class ProcessOrchestrator;
+class Project;
+class ProjectAssets;
+class Subprocess;
 
 class WorkspaceState : public IEditorState {
  public:
@@ -20,13 +24,13 @@ class WorkspaceState : public IEditorState {
 
   void update() override;
 
-  [[nodiscard]] inline const Project& get_project() const { return *project; }
-  [[nodiscard]] inline const ProjectAssets& get_project_assets() const { return *project_assets; }
+  [[nodiscard]] const Project& get_project() const;
+  [[nodiscard]] const ProjectAssets& get_project_assets() const;
 
   static Result<std::unique_ptr<WorkspaceState>> create(std::unique_ptr<Project> project, const EditorContext& context);
+
  private:
-  explicit WorkspaceState(std::unique_ptr<Project> project)
-  : project(std::move(project)) {}
+  explicit WorkspaceState(std::unique_ptr<Project> project);
 
   std::vector<std::unique_ptr<Subprocess>> active_processes;
 

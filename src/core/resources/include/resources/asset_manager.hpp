@@ -1,23 +1,22 @@
 #pragma once
 
-#include <vector>
+#include <concepts>
 #include <cstdint>
-#include <string>
-#include <string_view>
-#include <typeindex>
-#include <unordered_map>
 #include <memory>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
 
-#include <resources/asset_types.hpp>
-#include <resources/resources_context.hpp>
-#include <resources/asset_handle.hpp>
-#include <utils/string_hash.hpp>
-#include <utils/result.hpp>
+#include "resources/asset_handle.hpp"
+#include "resources/asset_pool.hpp"
+#include "resources/asset_types.hpp"
+#include "utils/result.hpp"
 #include "utils/uuid.hpp"
 
-#include "resources/asset_pool.hpp"
-
 namespace mole {
+
+class IFileSystem;
+struct ResourcesContext;
 
 /**
  * @brief Central manager for loading, caching, and retrieving assets via type-specific pools.
@@ -33,11 +32,11 @@ class AssetManager {
     auto r_asset_header = read_asset_header("assets://" + uuid.to_string() + ".asset");
     if (!r_asset_header) {
       return mole::fail(r_asset_header.error());
-    };
+    }
     AssetHeader header = std::move(r_asset_header).value();
 
     if (header.asset_type != T::ASSET_TYPE) {
-      return mole::fail("Requested asset type does not match the asset type stored in the physical asset header");;
+      return mole::fail("Requested asset type does not match the asset type stored in the physical asset header");
     }
 
     return get_pool<T>()->load(uuid);

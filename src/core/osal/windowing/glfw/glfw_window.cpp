@@ -1,20 +1,22 @@
 #if defined(BIRD_PLATFORM_WINDOWS)
 #define GLFW_EXPOSE_NATIVE_WIN32
 #elif defined(BIRD_PLATFORM_APPLE)
-#define  GLFW_EXPOSE_NATIVE_COCOA
+#define GLFW_EXPOSE_NATIVE_COCOA
 #endif
 
-#include "glfw_window.hpp"
+#include "osal/windowing/glfw/glfw_window.hpp"
 
 #include <algorithm>
+#include <cstdint>
+#include <string>
+
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
 #include "osal/inputs/glfw/glfw_inputs.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
-
-using namespace inputs;
 
 GlfwWindow::GlfwWindow(const WindowOptions& options)
     : title(options.title),
@@ -65,10 +67,10 @@ Result<void> GlfwWindow::init() {
     mole_window->frame_buffer_resize_callback(mole_window->glfw_window, width, height);
   });
 
-  glfwSetKeyCallback(glfw_window, GlfwInputs::key_callback);
-  glfwSetMouseButtonCallback(glfw_window, GlfwInputs::mouse_button_callback);
-  glfwSetCursorPosCallback(glfw_window, GlfwInputs::cursor_pos_callback);
-  glfwSetScrollCallback(glfw_window, GlfwInputs::scrollCallback);
+  glfwSetKeyCallback(glfw_window, inputs::GlfwInputs::key_callback);
+  glfwSetMouseButtonCallback(glfw_window, inputs::GlfwInputs::mouse_button_callback);
+  glfwSetCursorPosCallback(glfw_window, inputs::GlfwInputs::cursor_pos_callback);
+  glfwSetScrollCallback(glfw_window, inputs::GlfwInputs::scrollCallback);
 
   return mole::ok();
 }
@@ -118,7 +120,7 @@ bool GlfwWindow::is_minimized() const noexcept {
   return glfwGetWindowAttrib(glfw_window, GLFW_ICONIFIED) != 0 || framebuffer_width == 0 || framebuffer_height == 0;
 }
 
-Inputs& GlfwWindow::get_inputs() {
+inputs::Inputs& GlfwWindow::get_inputs() {
   return inputs;
 }
 

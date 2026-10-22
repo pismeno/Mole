@@ -1,6 +1,13 @@
 #include "rendering/material_shader_layout_reflector.hpp"
 
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
 #include <spirv_cross.hpp>
+
+#include "rendering/material_shader_layout.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
 
@@ -48,11 +55,11 @@ Result<MaterialShaderLayout> MaterialShaderLayoutReflector::reflect(const uint32
     layout_info.total_size = compiler.get_declared_struct_size(struct_type);
 
     found_buffer = true;
-    break; // Found our buffer, stop searching
+    break;
   }
 
   if (!found_buffer) {
-    return mole::fail("Could not find a valid MaterialBuffer SSBO in the SPIR-V bytecode.");
+    return mole::fail("Missing 'MaterialBuffer' SSBO");
   }
 
   return layout_info;

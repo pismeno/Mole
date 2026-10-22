@@ -4,15 +4,15 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include "utils/result.hpp"
-#include "rendering/vulkan/vulkan_context.hpp"
-#include "rendering/vulkan/vulkan_swapchain.hpp"
-#include "rendering/vulkan/vulkan_material_handler.hpp"
-#include "resources/asset_manager.hpp"
-#include "resources/asset_types.hpp"
 #include "resources/asset_handle.hpp"
+#include "resources/asset_types.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
+
+class VulkanContext;
+class VulkanMaterialHandler;
+class VulkanSwapchain;
 
 struct VulkanPipelineOptions {
   VulkanSwapchain& swapchain;

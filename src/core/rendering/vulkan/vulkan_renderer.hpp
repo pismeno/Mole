@@ -1,36 +1,37 @@
 #pragma once
 
-#include <rendering/irenderer.hpp>
+#include "rendering/irenderer.hpp"
 
 #ifdef BIRD_PLATFORM_WINDOWS
 #include <windows.h>
 #endif
 
-#include <vulkan/vulkan_raii.hpp>
-#include <vk_mem_alloc_raii.hpp>
-
+#include <cstddef>
 #include <cstdint>
-#include <vector>
-#include <string>
 #include <memory>
+#include <vector>
 
-#include <rendering/vulkan/quad.hpp>
-#include <rendering/vulkan/render_batch.hpp>
-#include <rendering/vulkan/vulkan_context.hpp>
-#include <rendering/vulkan/vulkan_memory_allocator.hpp>
-#include <rendering/vulkan/vulkan_swapchain.hpp>
-#include <rendering/vulkan/vulkan_pipeline_cache.hpp>
-#include <rendering/vulkan/vulkan_pipeline.hpp>
-#include <rendering/vulkan/vulkan_material_handler.hpp>
-#include <rendering/rendering_context.hpp>
-#include <resources/render_commands.hpp>
-#include <resources/asset_handle.hpp>
-#include <resources/asset_manager.hpp>
-#include <resources/asset_types.hpp>
-#include <utils/result.hpp>
+#include <vk_mem_alloc_raii.hpp>
+#include <vulkan/vulkan_raii.hpp>
+
+#include "rendering/vulkan/quad.hpp"
+#include "rendering/vulkan/render_batch.hpp"
+#include "resources/material_types.hpp"
+#include "resources/render_commands.hpp"
+#include "resources/view_data.hpp"
 #include "utils/counter.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
+
+class AssetManager;
+class MaterialPool;
+class VulkanContext;
+class VulkanMaterialHandler;
+class VulkanMemoryAllocator;
+class VulkanPipelineCache;
+class VulkanSwapchain;
+struct RenderingContext;
 
 class VulkanRenderer : public IRenderer {
  public:
@@ -110,8 +111,8 @@ class VulkanRenderer : public IRenderer {
   ViewData current_view_data_;
 
   // mole systems
-  AssetManager* asset_manager;
-  MaterialPool* material_pool;
+  AssetManager* asset_manager = nullptr;
+  MaterialPool* material_pool = nullptr;
 
   std::vector<RenderQuadCommand> pending_commands;
   std::vector<RenderBatch> batches;

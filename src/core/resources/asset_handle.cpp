@@ -1,7 +1,11 @@
 #include "resources/asset_handle.hpp"
 
+#include <cstdint>
+#include <limits>
+
 #include "resources/asset_pool.hpp"
 #include "resources/asset_types.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
 

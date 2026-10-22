@@ -1,9 +1,7 @@
 #include <iostream>
 
-#define GLFW_INCLUDE_NONE
-#include "glslang/Public/ShaderLang.h"
-
-#include <editor/editor.hpp>
+#include "editor/editor.hpp"
+#include "utils/result.hpp"
 
 int main() {
   using namespace mole;

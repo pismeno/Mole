@@ -1,23 +1,30 @@
 #pragma once
 
-#include <vulkan/vulkan_raii.hpp>
-#include <vk_mem_alloc_raii.hpp>
-#include <vector>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <unordered_map>
+#include <vector>
 
-#include "rendering/vulkan/vulkan_context.hpp"
-#include "rendering/vulkan/vulkan_memory_allocator.hpp"
-#include "rendering/rendering_context.hpp"
-#include "rendering/bindless_texture_registry.hpp"
-#include "rendering/packed_material_cache.hpp"
-#include "resources/material_types.hpp"
-#include "resources/material_pool.hpp"
+#include <vk_mem_alloc_raii.hpp>
+#include <vulkan/vulkan_raii.hpp>
+
 #include "resources/asset_handle.hpp"
 #include "resources/asset_types.hpp"
-#include "utils/result.hpp"
+#include "resources/material_types.hpp"
 #include "utils/counter.hpp"
+#include "utils/result.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
+
+class AssetManager;
+class BindlessTextureRegistry;
+class MaterialPool;
+class PackedMaterialCache;
+class VulkanContext;
+class VulkanMemoryAllocator;
+struct RenderingContext;
 
 class VulkanMaterialHandler {
  public:
@@ -41,14 +48,7 @@ class VulkanMaterialHandler {
       const VulkanContext& vk_context,
       const VulkanMemoryAllocator& memory_allocator,
       const Counter& frames_rendered,
-      const RenderingContext& context)
-      : frames_rendered(frames_rendered),
-        vk_context(vk_context),
-        memory_allocator(memory_allocator),
-        bindless_texture_registry(context.bindless_texture_registry),
-        material_pool(context.resources_context->material_pool),
-        asset_manager(context.resources_context->asset_manager),
-        packed_material_cache(context.packed_material_cache) {}
+      const RenderingContext& context);
 
   struct GpuTexture {
     UUID asset_uuid;

@@ -1,14 +1,41 @@
 #include "editor/states/workspace_state.hpp"
 
+#include <cassert>
+#include <filesystem>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "editor/editor_context.hpp"
+#include "editor/file_watcher.hpp"
+#include "editor/process_orchestrator.hpp"
+#include "editor/project.hpp"
+#include "editor/project_assets.hpp"
+#include "editor/subprocess.hpp"
 #include "osal/ifile_system.hpp"
 #include "osal/os_context.hpp"
+#include "resources/asset_manager.hpp"
+#include "resources/resources_context.hpp"
 #include "utils/result.hpp"
-#include "editor/file_watcher.hpp"
-#include "editor/editor_context.hpp"
-#include "editor/project.hpp"
-#include "editor/subprocess.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
+
+WorkspaceState::WorkspaceState(std::unique_ptr<Project> project)
+    : project(std::move(project)),
+      file_system(nullptr),
+      asset_manager(nullptr),
+      process_orchestrator(nullptr) {}
+
+const Project& WorkspaceState::get_project() const {
+  return *project;
+}
+
+const ProjectAssets& WorkspaceState::get_project_assets() const {
+  return *project_assets;
+}
 
 Result<std::unique_ptr<WorkspaceState>> WorkspaceState::create(std::unique_ptr<Project> project, const EditorContext& context) {
   std::unique_ptr<WorkspaceState> state(new WorkspaceState(std::move(project)));

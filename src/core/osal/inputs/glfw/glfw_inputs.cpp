@@ -1,7 +1,9 @@
-#include "glfw_inputs.hpp"
-#include <osal/inputs.hpp>
+#include "osal/inputs/glfw/glfw_inputs.hpp"
 
-#include "GLFW/glfw3.h"
+#include <cstdint>
+
+#include <GLFW/glfw3.h>
+
 #include "osal/windowing/glfw/glfw_window.hpp"
 
 namespace mole::inputs {
@@ -85,14 +87,6 @@ inline void GlfwInputs::endFrameMouse() noexcept {
   for (int i = 0; i < MAX_MOUSE_BUTTONS; i++) {
     previousMouseState[i] = currentMouseState[i];
   }
-
-  previousMouseX = mouseX;
-  previousMouseY = mouseY;
-
-  scrollX = 0.0f;
-  scrollY = 0.0f;
-  previousScrollX = 0.0f;
-  previousScrollY = 0.0f;
 }
 
 void GlfwInputs::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {

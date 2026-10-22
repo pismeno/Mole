@@ -1,12 +1,12 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <queue>
-#include <mutex>
-#include <memory>
-#include <thread>
 #include <atomic>
+#include <memory>
+#include <mutex>
+#include <queue>
+#include <string>
+#include <thread>
+#include <vector>
 
 #include <reproc++/reproc.hpp>
 

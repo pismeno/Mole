@@ -1,20 +1,20 @@
 #pragma once
 
-#include <string_view>
-#include <string>
-#include <vector>
-#include <filesystem>
-#include <mutex>
-#include <memory>
 #include <chrono>
+#include <filesystem>
+#include <memory>
+#include <mutex>
+#include <string_view>
 #include <unordered_map>
+#include <vector>
 
 #include <wtr/watcher.hpp>
 
-#include "editor/editor_context.hpp"
 #include "utils/result.hpp"
 
 namespace mole {
+
+struct EditorContext;
 
 enum class FileWatchEventType {
   Created,
@@ -34,9 +34,9 @@ class FileWatcher {
   std::vector<FileWatchEvent> poll_events();
 
   static Result<std::unique_ptr<FileWatcher>> create(std::string_view watch_path, const EditorContext& editor_context);
+
  private:
-  explicit FileWatcher(std::filesystem::path watch_path)
-      : watch_path(std::move(watch_path)) {}
+  explicit FileWatcher(std::filesystem::path watch_path);
 
   void start();
   void push_event(std::filesystem::path path, FileWatchEventType type);

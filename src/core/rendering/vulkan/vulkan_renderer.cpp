@@ -1,17 +1,37 @@
 #include "rendering/vulkan/vulkan_renderer.hpp"
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
-#include <algorithm>
-#include <string>
-#include <memory>
 #include <iostream>
+#include <memory>
+#include <optional>
+#include <ranges>
+#include <utility>
+#include <vector>
 
-#include <rendering/vulkan/vulkan_context.hpp>
-#include <rendering/vulkan/vulkan_memory_allocator.hpp>
-#include <rendering/vulkan/vulkan_swapchain.hpp>
-#include <rendering/vulkan/vulkan_pipeline.hpp>
-#include <utils/result.hpp>
+#include <vk_mem_alloc_raii.hpp>
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_raii.hpp>
+
+#include "rendering/rendering_context.hpp"
+#include "rendering/vulkan/combined_shader_key.hpp"
+#include "rendering/vulkan/quad.hpp"
+#include "rendering/vulkan/render_batch.hpp"
+#include "rendering/vulkan/vulkan_context.hpp"
+#include "rendering/vulkan/vulkan_material_handler.hpp"
+#include "rendering/vulkan/vulkan_memory_allocator.hpp"
+#include "rendering/vulkan/vulkan_pipeline.hpp"
+#include "rendering/vulkan/vulkan_pipeline_cache.hpp"
+#include "rendering/vulkan/vulkan_swapchain.hpp"
+#include "resources/asset_handle.hpp"
+#include "resources/asset_manager.hpp"
+#include "resources/material.hpp"
+#include "resources/material_pool.hpp"
+#include "resources/resources_context.hpp"
+#include "utils/counter.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
 

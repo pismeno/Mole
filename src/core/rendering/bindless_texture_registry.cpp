@@ -1,7 +1,10 @@
 #include "rendering/bindless_texture_registry.hpp"
 
 #include <cstdint>
+#include <vector>
 
+#include "resources/asset_handle.hpp"
+#include "resources/asset_types.hpp"
 #include "utils/result.hpp"
 
 namespace mole {
@@ -48,22 +51,23 @@ uint32_t BindlessTextureRegistry::allocate_index(const AssetHandle<ImageAsset>& 
 void BindlessTextureRegistry::free_index(uint64_t texture_id) {
   auto it = bindless_indices.find(texture_id);
   if (it == bindless_indices.end()) {
-    uint32_t bindless_index = it->second;
-    recycled_indices.push_back(bindless_index);
-    bindless_indices.erase(texture_id);
+    return;
   }
-  pending_texture_uploads.erase(texture_id);
+
+  uint32_t index = it->second;
+  bindless_indices.erase(it);
+  recycled_indices.push_back(index);
 }
 
-[[nodiscard]] std::vector<AssetHandle<ImageAsset>> BindlessTextureRegistry::get_pending_texture_uploads() const {
-  std::vector<AssetHandle<ImageAsset>> requests;
-  requests.reserve(pending_texture_uploads.size());
+std::vector<AssetHandle<ImageAsset>> BindlessTextureRegistry::get_pending_texture_uploads() const {
+  std::vector<AssetHandle<ImageAsset>> uploads;
+  uploads.reserve(pending_texture_uploads.size());
 
-  for (const auto& [key, request] : pending_texture_uploads) {
-    requests.push_back(request);
+  for (const auto& [id, handle] : pending_texture_uploads) {
+    uploads.push_back(handle);
   }
 
-  return requests;
+  return uploads;
 }
 
 void BindlessTextureRegistry::clear_pending_texture_uploads() {

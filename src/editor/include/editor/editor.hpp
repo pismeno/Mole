@@ -2,35 +2,37 @@
 
 #include <memory>
 
-#include <editor/editor_context.hpp>
-#include <utils/result.hpp>
-#include <osal/iwindow.hpp>
-#include <rendering/irenderer.hpp>
-#include <osal/ifile_system.hpp>
-#include <osal/os_context.hpp>
-#include <resources/resources_context.hpp>
-#include <resources/asset_manager.hpp>
-#include <resources/material_pool.hpp>
-#include <node_system/node_system_context.hpp>
-#include <rendering/rendering_context.hpp>
-#include <rendering/bindless_texture_registry.hpp>
-#include <rendering/material_shader_layout_reflector.hpp>
-#include <rendering/material_shader_layout_registry.hpp>
-#include <rendering/material_packer.hpp>
-#include <rendering/packed_material_cache.hpp>
-#include <node_system/scene_factory.hpp>
-#include <node_system/render_gatherer.hpp>
-#include <editor/states/ieditor_state.hpp>
-#include <editor/process_orchestrator.hpp>
+#include "editor/editor_context.hpp"
+#include "node_system/node_system_context.hpp"
+#include "osal/os_context.hpp"
+#include "rendering/rendering_context.hpp"
+#include "resources/resources_context.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
+
+class AssetManager;
+class BindlessTextureRegistry;
+class IEditorState;
+class IFileSystem;
+class IRenderer;
+class IWindow;
+class MaterialPacker;
+class MaterialPool;
+class MaterialShaderLayoutReflector;
+class MaterialShaderLayoutRegistry;
+class PackedMaterialCache;
+class ProcessOrchestrator;
+class RenderGatherer;
+class Scene;
+class SceneFactory;
 
 class Editor {
  public:
   static constexpr float PPU = 32.0f; // TODO move into some sort of settings
 
-  explicit Editor() = default;
-  ~Editor() = default;
+  explicit Editor();
+  ~Editor();
 
   Result<void> init();
   Result<void> run();

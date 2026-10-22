@@ -1,8 +1,9 @@
-#include <resources/asset_types.hpp>
+#include "resources/asset_types.hpp"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
-#include <cstdint>
+#include <vector>
 
 namespace mole {
 

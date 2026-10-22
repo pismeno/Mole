@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 #include "resources/asset_handle.hpp"
 #include "resources/asset_types.hpp"

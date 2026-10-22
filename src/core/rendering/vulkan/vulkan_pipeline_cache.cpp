@@ -1,6 +1,33 @@
-#include "vulkan_pipeline_cache.hpp"
+#include "rendering/vulkan/vulkan_pipeline_cache.hpp"
+
+#include <cassert>
+#include <memory>
+#include <utility>
+
+#include <vulkan/vulkan_raii.hpp>
+
+#include "rendering/vulkan/combined_shader_key.hpp"
+#include "rendering/vulkan/vulkan_context.hpp"
+#include "rendering/vulkan/vulkan_material_handler.hpp"
+#include "rendering/vulkan/vulkan_pipeline.hpp"
+#include "rendering/vulkan/vulkan_swapchain.hpp"
+#include "resources/asset_handle.hpp"
+#include "resources/asset_types.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
+
+VulkanPipelineCache::VulkanPipelineCache(
+    VulkanSwapchain& swapchain,
+    VulkanContext& vk_context,
+    VulkanMaterialHandler& material_handler,
+    vk::raii::DescriptorSetLayout& descriptor_set_layout)
+    : swapchain(swapchain),
+      vk_context(vk_context),
+      material_handler(material_handler),
+      descriptor_set_layout(descriptor_set_layout) {}
+
+VulkanPipelineCache::~VulkanPipelineCache() = default;
 
 Result<VulkanPipeline*> VulkanPipelineCache::get(const AssetHandle<VertexShaderAsset>& vert, const AssetHandle<FragmentShaderAsset>& frag) {
   CombinedShaderKey key{vert.get_packed_id(), frag.get_packed_id()};

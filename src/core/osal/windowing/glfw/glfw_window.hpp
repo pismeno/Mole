@@ -1,15 +1,16 @@
 #pragma once
 
-#include <osal/iwindow.hpp>
+#include "osal/iwindow.hpp"
 
-#include "GLFW/glfw3.h"
+#include <cstdint>
+#include <string>
 
 #include "osal/inputs/glfw/glfw_inputs.hpp"
-#include <utils/result.hpp>
+#include "utils/result.hpp"
+
+struct GLFWwindow;
 
 namespace mole {
-
-using namespace inputs;
 
 class GlfwWindow : public IWindow {
 
@@ -31,7 +32,7 @@ class GlfwWindow : public IWindow {
   bool is_fullscreen() const noexcept override;
   bool is_minimized() const noexcept override;
   void set_fullscreen(bool fullscreen) override;
-  Inputs& get_inputs() override;
+  inputs::Inputs& get_inputs() override;
   void* get_native_handle() const override;
 
  private:
@@ -51,7 +52,7 @@ class GlfwWindow : public IWindow {
   int windowed_x{}, windowed_y{};
   bool is_fullscreen_{};
 
-  GlfwInputs inputs;
+  inputs::GlfwInputs inputs;
 
   void window_resize_callback(GLFWwindow* window, int width, int height);
   void frame_buffer_resize_callback(GLFWwindow* window, int width, int height);

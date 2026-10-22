@@ -1,5 +1,13 @@
 #include "resources/material_pool.hpp"
+
 #include <cassert>
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <utility>
+
+#include "resources/material.hpp"
+#include "resources/material_types.hpp"
 
 namespace mole {
 

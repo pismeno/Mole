@@ -1,8 +1,15 @@
-#include "windows_file_system.hpp"
+#include "osal/file_system/windows_file_system.hpp"
+
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <string>
+
+#include "utils/result.hpp"
 
 namespace mole {
 
@@ -47,7 +54,6 @@ Result<std::filesystem::path> WindowsFileSystem::resolve(std::string_view virtua
   }
 
   std::string prefix = std::string(virtual_path.substr(0, delim_pos));
-
   std::string_view relative_path = virtual_path.substr(delim_pos + 3);
 
   if (auto it = mount_points.find(prefix); it != mount_points.end()) {

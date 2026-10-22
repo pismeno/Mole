@@ -1,30 +1,53 @@
-#include <editor/editor.hpp>
+#include "editor/editor.hpp"
 
-#include <iostream>
-#include <thread>
 #include <chrono>
+#include <iostream>
+#include <memory>
+#include <thread>
+#include <utility>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
-
-#include <glslang/Public/ShaderLang.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glslang/Public/ShaderLang.h>
 
-#include <rendering/irenderer.hpp>
-#include <osal/iwindow.hpp>
-#include <osal/ifile_system.hpp>
-#include <resources/asset_manager.hpp>
-#include <node_system/scene_factory.hpp>
-#include <node_system/managers/drawable_manager.hpp>
-#include <node_system/managers/transform_manager.hpp>
-#include <resources/asset_types.hpp>
-
+#include "editor/editor_context.hpp"
 #include "editor/process_orchestrator.hpp"
-#include "resources/material_pool.hpp"
-#include "editor/subprocess.hpp"
+#include "editor/project.hpp"
+#include "editor/project_assets.hpp"
 #include "editor/states/workspace_state.hpp"
+#include "editor/subprocess.hpp"
+#include "node_system/managers/drawable_manager.hpp"
+#include "node_system/managers/transform_manager.hpp"
+#include "node_system/node_system_context.hpp"
+#include "node_system/render_gatherer.hpp"
+#include "node_system/scene.hpp"
+#include "node_system/scene_factory.hpp"
+#include "osal/ifile_system.hpp"
+#include "osal/inputs.hpp"
+#include "osal/iwindow.hpp"
+#include "osal/os_context.hpp"
+#include "rendering/bindless_texture_registry.hpp"
+#include "rendering/irenderer.hpp"
+#include "rendering/material_packer.hpp"
+#include "rendering/material_shader_layout_reflector.hpp"
+#include "rendering/material_shader_layout_registry.hpp"
+#include "rendering/packed_material_cache.hpp"
+#include "rendering/rendering_context.hpp"
+#include "resources/asset_handle.hpp"
+#include "resources/asset_manager.hpp"
+#include "resources/asset_types.hpp"
+#include "resources/material.hpp"
+#include "resources/material_pool.hpp"
+#include "resources/resources_context.hpp"
+#include "resources/view_data.hpp"
+#include "utils/result.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
+
+Editor::Editor() = default;
+Editor::~Editor() = default;
 
 Result<void> Editor::init() {
   auto r_create_file_system = IFileSystem::create();
@@ -138,7 +161,7 @@ Result<void> Editor::init() {
   auto r_get_texture = asset_manager->acquire<ImageAsset>(r_res_uuid.value());
   if (!r_get_texture) return mole::fail(r_get_texture.error());
   AssetHandle<ImageAsset> texture = std::move(r_get_texture).value();
-  std::cout << bindless_texture_registry->get_index(texture) << " - Tex index" << std::endl;;
+  std::cout << bindless_texture_registry->get_index(texture) << " - Tex index" << std::endl;
 
   r_res_uuid = workspace_state->get_project_assets().resolve("mat_a.vert.glsl", AssetType::VertexShader);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
@@ -199,6 +222,8 @@ Result<void> Editor::init() {
 }
 
 Result<void> Editor::run() {
+  using namespace inputs;
+
   auto r_get_texture = asset_manager->acquire<ImageAsset>(UUID::from_string("8bc0a019-b4f8-446d-83ae-3ba78c59e10b"));
   if (!r_get_texture) return mole::fail(r_get_texture.error());
   AssetHandle<ImageAsset> texture = std::move(r_get_texture).value();

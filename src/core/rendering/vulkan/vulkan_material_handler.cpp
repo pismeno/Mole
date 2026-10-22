@@ -1,12 +1,51 @@
 #include "rendering/vulkan/vulkan_material_handler.hpp"
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
-#include <vector>
+#include <memory>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
+#include <vk_mem_alloc_raii.hpp>
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_raii.hpp>
+
+#include "rendering/bindless_texture_registry.hpp"
+#include "rendering/packed_material.hpp"
+#include "rendering/packed_material_cache.hpp"
+#include "rendering/rendering_context.hpp"
+#include "rendering/vulkan/vulkan_context.hpp"
+#include "rendering/vulkan/vulkan_memory_allocator.hpp"
+#include "resources/asset_handle.hpp"
 #include "resources/asset_manager.hpp"
+#include "resources/asset_types.hpp"
+#include "resources/material.hpp"
+#include "resources/material_pool.hpp"
+#include "resources/material_types.hpp"
+#include "resources/resources_context.hpp"
+#include "utils/counter.hpp"
+#include "utils/result.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
+
+VulkanMaterialHandler::VulkanMaterialHandler(
+    const VulkanContext& vk_context,
+    const VulkanMemoryAllocator& memory_allocator,
+    const Counter& frames_rendered,
+    const RenderingContext& context)
+    : frames_rendered(frames_rendered),
+      vk_context(vk_context),
+      memory_allocator(memory_allocator),
+      bindless_texture_registry(context.bindless_texture_registry),
+      material_pool(context.resources_context->material_pool),
+      asset_manager(context.resources_context->asset_manager),
+      packed_material_cache(context.packed_material_cache) {}
 
 Result<std::unique_ptr<VulkanMaterialHandler>> VulkanMaterialHandler::create(
     const VulkanContext& vk_context,

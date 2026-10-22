@@ -1,15 +1,17 @@
 #pragma once
 
-#include <vector>
-#include <memory>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <vector>
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include <rendering/vulkan/vulkan_context.hpp>
 #include "utils/result.hpp"
 
 namespace mole {
+
+class VulkanContext;
 
 class VulkanSwapchain {
  public:

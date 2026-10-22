@@ -1,5 +1,11 @@
 #include "editor/project.hpp"
 
+#include <filesystem>
+#include <memory>
+#include <utility>
+
+#include "utils/result.hpp"
+
 namespace mole {
 
 Result<std::unique_ptr<Project>> Project::create(const ProjectOptions& options) {

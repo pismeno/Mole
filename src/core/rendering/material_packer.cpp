@@ -1,9 +1,24 @@
 #include "rendering/material_packer.hpp"
 
-#include <resources/asset_handle.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <type_traits>
+#include <variant>
+#include <vector>
+
+#include "rendering/bindless_texture_registry.hpp"
+#include "rendering/material_shader_layout.hpp"
+#include "rendering/packed_material.hpp"
+#include "rendering/rendering_context.hpp"
+#include "resources/asset_handle.hpp"
 #include "resources/asset_types.hpp"
+#include "resources/material.hpp"
 
 namespace mole {
+
+MaterialPacker::MaterialPacker(RenderingContext& rendering_context)
+    : bindless_texture_registry(rendering_context.bindless_texture_registry) {}
 
 PackedMaterial MaterialPacker::pack(const Material& material, const MaterialShaderLayout& layout) const {
   std::vector<std::byte> buffer(layout.total_size, std::byte{0});

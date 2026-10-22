@@ -1,7 +1,17 @@
 #include "editor/subprocess.hpp"
 
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <system_error>
+#include <tuple>
 #include <utility>
+#include <vector>
+
 #include <reproc++/drain.hpp>
+
+#include "utils/result.hpp"
 
 namespace mole {
 

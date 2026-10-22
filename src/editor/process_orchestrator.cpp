@@ -1,8 +1,19 @@
 #include "editor/process_orchestrator.hpp"
-#include "editor/subprocess.hpp"
+
+#include <functional>
 #include <iostream>
+#include <iterator>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "editor/subprocess.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
+
+ProcessOrchestrator::~ProcessOrchestrator() = default;
 
 Result<void> ProcessOrchestrator::spawn(const std::vector<std::string>& command,
                                 std::function<void()> on_finish) {

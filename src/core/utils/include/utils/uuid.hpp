@@ -2,17 +2,18 @@
 
 #include <array>
 #include <cstdint>
-#include <string>
-#include <random>
+#include <cstdio>
 #include <functional>
+#include <random>
+#include <string>
 
 namespace mole {
 
 struct UUID { // Implemented using Gemini AI
-  std::array<uint8_t, 16> data;
+  std::array<uint8_t, 16> data{};
 
   // Default constructor (creates an empty/zero UUID)
-  UUID() : data{0} {}
+  UUID() = default;
 
   // Construct from existing data
   explicit UUID(const std::array<uint8_t, 16>& d) : data(d) {}

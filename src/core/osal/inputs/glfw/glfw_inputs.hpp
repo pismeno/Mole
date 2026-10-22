@@ -1,8 +1,8 @@
 #pragma once
 
-#include "GLFW/glfw3.h"
+#include "osal/inputs.hpp"
 
-#include <osal/inputs.hpp>
+struct GLFWwindow;
 
 namespace mole {
 class GlfwWindow;

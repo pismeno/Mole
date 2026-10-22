@@ -1,9 +1,12 @@
 #pragma once
 
-#include <resources/render_commands.hpp>
-#include <node_system/scene.hpp>
+#include <vector>
+
+#include "resources/render_commands.hpp"
 
 namespace mole {
+
+class Scene;
 
 class RenderGatherer {
  public:

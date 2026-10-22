@@ -148,6 +148,7 @@ target_sources(MoleRendering
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/material_shader_layout_reflector.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/packed_material_cache.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/material_packer.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rendering/material_shader_layout_registry.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/irenderer.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/packed_material.hpp

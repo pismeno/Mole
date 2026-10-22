@@ -1,12 +1,15 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
+#include <string>
+#include <string_view>
 
 #include "utils/result.hpp"
-#include "file_watcher.hpp"
-#include "editor/editor_context.hpp"
 
 namespace mole {
+
+struct EditorContext;
 
 struct ProjectOptions {
   std::string name;

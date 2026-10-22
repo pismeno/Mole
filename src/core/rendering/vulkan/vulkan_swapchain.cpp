@@ -1,8 +1,18 @@
-#include "vulkan_swapchain.hpp"
+#include "rendering/vulkan/vulkan_swapchain.hpp"
 
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <limits>
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
+
+#include "rendering/vulkan/vulkan_context.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
 

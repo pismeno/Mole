@@ -1,10 +1,25 @@
 #include "rendering/packed_material_cache.hpp"
 
-#include "resources/material_pool.hpp"
-#include "rendering/material_shader_layout_registry.hpp"
+#include <cstdint>
+#include <utility>
+#include <vector>
+
 #include "rendering/material_packer.hpp"
+#include "rendering/material_shader_layout.hpp"
+#include "rendering/material_shader_layout_registry.hpp"
+#include "rendering/rendering_context.hpp"
+#include "resources/material.hpp"
+#include "resources/material_pool.hpp"
+#include "resources/material_types.hpp"
+#include "resources/resources_context.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
+
+PackedMaterialCache::PackedMaterialCache(RenderingContext& context)
+    : material_shader_layout_registry(context.material_shader_layout_registry),
+      material_packer(context.material_packer),
+      material_pool(context.resources_context->material_pool) {}
 
 Result<PackedMaterial> PackedMaterialCache::get(MaterialID material_id) {
   if (!material_pool->is_valid(material_id)) {

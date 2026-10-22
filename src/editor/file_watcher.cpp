@@ -1,8 +1,24 @@
 #include "editor/file_watcher.hpp"
+
+#include <chrono>
+#include <filesystem>
+#include <memory>
+#include <mutex>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+#include <wtr/watcher.hpp>
+
+#include "editor/editor_context.hpp"
 #include "osal/ifile_system.hpp"
 #include "osal/os_context.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
+
+FileWatcher::FileWatcher(std::filesystem::path watch_path)
+    : watch_path(std::move(watch_path)) {}
 
 Result<std::unique_ptr<FileWatcher>> FileWatcher::create(std::string_view watch_path, const EditorContext& context) {
   auto r_resolve_path = context.os_context->file_system->resolve(watch_path);

@@ -1,16 +1,18 @@
 #pragma once
 
+#include <functional>
 #include <string>
-#include <string_view>
-#include <variant>
 #include <unordered_map>
+#include <variant>
 
 #include <glm/glm.hpp>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
-#include "utils/result.hpp"
-#include "utils/string_hash.hpp"
 #include "resources/asset_handle.hpp"
 #include "resources/asset_types.hpp"
+#include "utils/string_hash.hpp"
 
 namespace mole {
 

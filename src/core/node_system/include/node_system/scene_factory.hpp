@@ -1,19 +1,23 @@
 #pragma once
 
-#include <node_system/scene.hpp>
-#include <node_system/inode_manager.hpp>
-
-#include <memory>
+#include <concepts>
 #include <functional>
-#include <cassert>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
 
-#include <node_system/node_types.hpp>
-#include <node_system/node_system_context.hpp>
-#include <resources/asset_manager.hpp>
-#include <osal/ifile_system.hpp>
-#include <utils/result.hpp>
+#include "node_system/inode_manager.hpp"
+#include "utils/result.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
+
+class AssetManager;
+class IFileSystem;
+class Scene;
+struct NodeSystemContext;
 
 using ManagerFactory = std::function<std::unique_ptr<INodeManager>()>;
 
@@ -22,14 +26,16 @@ using ManagerFactory = std::function<std::unique_ptr<INodeManager>()>;
  */
 class SceneFactory {
  public:
+  ~SceneFactory();
+
   /**
    * @brief Loads scene definitions from a json source, into this instance of SceneFactory.
    */
   Result<void> load_scene_definitions_from(const std::string_view definitions_source);
 
   /**
- * @brief Loads node definitions from a json source, into this instance of SceneFactory.
- */
+   * @brief Loads node definitions from a json source, into this instance of SceneFactory.
+   */
   Result<void> load_node_definitions_from(const std::string_view definitions_source);
 
   /**
@@ -42,23 +48,24 @@ class SceneFactory {
   Result<void> save_scene_to(const Scene& scene, std::string_view path) const;
 
   /**
- * @brief Registers a manager for this SceneFactory instance.
- * @note Asserts that the manager name must be unique.
- */
+   * @brief Registers a manager for this SceneFactory instance.
+   * @note Asserts that the manager name must be unique.
+   */
   template <typename T>
   requires std::derived_from<T, INodeManager> && std::default_initializable<T>
   void register_manager() {
-    std::string name = T::TYPE_ID;
-
-    assert(manager_registry.find(name) == manager_registry.end() && "Manager name already registered!");
-
-    manager_registry[name] = []() -> std::unique_ptr<INodeManager> { return std::make_unique<T>(); };
+    register_manager_factory(T::TYPE_ID, []() -> std::unique_ptr<INodeManager> {
+      return std::make_unique<T>();
+    });
   }
+
+  void register_manager_factory(std::string_view name, ManagerFactory factory);
 
   /**
    * @brief Creates a SceneFactory instance.
    */
   static Result<std::unique_ptr<SceneFactory>> create(const NodeSystemContext& context);
+
  private:
   explicit SceneFactory() = default;
 
@@ -77,8 +84,8 @@ class SceneFactory {
   std::unordered_map<std::string, NodeDefinition> node_definitions;
   std::unordered_map<std::string, SceneDefinition> scene_definitions;
 
-  AssetManager* asset_manager;
-  IFileSystem* file_system;
+  AssetManager* asset_manager = nullptr;
+  IFileSystem* file_system = nullptr;
 };
 
 } // mole

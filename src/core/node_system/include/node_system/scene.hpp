@@ -1,21 +1,22 @@
 #pragma once
 
-#include "node_types.hpp"
-#include "node.hpp"
-
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
-#include <unordered_map>
-#include <stdexcept>
 #include <span>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
 
-#include <glm/vec2.hpp>
 #include <nlohmann/json.hpp>
 
-#include <utils/result.hpp>
-#include <utils/string_hash.hpp>
-#include <node_system/inode_manager.hpp>
+#include "node_system/inode_manager.hpp"
+#include "node_system/node.hpp"
+#include "node_system/node_types.hpp"
+#include "utils/result.hpp"
+#include "utils/string_hash.hpp"
 
 namespace mole {
 
@@ -24,12 +25,8 @@ class Scene {
   friend class NodeHandle;
 
  public:
-
-  explicit Scene(std::string scene_type_name) : scene_type_name(std::move(scene_type_name)) {
-    nodes.resize(MAX_ACTIVE_NODES);
-    generations.resize(MAX_ACTIVE_NODES);
-    node_types.resize(MAX_ACTIVE_NODES);
-  }
+  explicit Scene(std::string scene_type_name);
+  ~Scene();
 
   [[nodiscard]] inline const std::string_view get_scene_type() const noexcept { return scene_type_name; }
 
@@ -57,13 +54,11 @@ class Scene {
   void add_manager(std::unique_ptr<INodeManager> manager);
   void add_node_type(std::string_view node_type, std::span<const std::string> node_managers);
 
+  INodeManager* get_manager_by_name(std::string_view type_id) const;
+
   template <typename T>
   T* get_manager() const {
-    auto it = managers_map.find(T::TYPE_ID);
-    if (it != managers_map.end()) {
-      return static_cast<T*>(it->second.get());
-    }
-    return nullptr;
+    return static_cast<T*>(get_manager_by_name(T::TYPE_ID));
   }
 
  private:

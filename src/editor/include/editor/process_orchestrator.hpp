@@ -2,18 +2,20 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
+#include <string>
 #include <vector>
 
-#include <mutex>
-
-#include "subprocess.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
 
+class Subprocess;
+
 class ProcessOrchestrator {
-public:
+ public:
   explicit ProcessOrchestrator() = default;
-  ~ProcessOrchestrator() = default;
+  ~ProcessOrchestrator();
 
   /// Spawns a new background process and registers it for tracking
   Result<void> spawn(const std::vector<std::string>& command, std::function<void()> on_finish = nullptr);
@@ -23,7 +25,8 @@ public:
 
   /// Call this once per frame in your main engine loop
   void update();
-private:
+
+ private:
   struct ProcessJob {
     std::unique_ptr<Subprocess> process;
     std::function<void()> on_finish;

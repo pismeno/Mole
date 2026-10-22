@@ -1,9 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <limits>
-#include <vector>
-#include <string>
 
 namespace mole {
 
@@ -42,7 +41,7 @@ namespace std {
 template <>
 struct hash<mole::MaterialID> {
   std::size_t operator()(const mole::MaterialID& m) const noexcept {
-    return std::hash<int>{}(m.id);
+    return std::hash<uint64_t>{}(m.id);
   }
 };
 

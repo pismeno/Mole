@@ -4,12 +4,13 @@
 #include <memory>
 #include <string>
 
-#include <osal/inputs.hpp>
-#include <utils/result.hpp>
+#include "utils/result.hpp"
 
 namespace mole {
 
-using namespace inputs;
+namespace inputs {
+class Inputs;
+}
 
 struct WindowOptions {
   uint32_t logical_width, logical_height;
@@ -52,7 +53,7 @@ class IWindow {
   /**
    * @return Inputs object, responsible for handling input events.
    */
-  virtual Inputs& get_inputs() = 0;
+  virtual inputs::Inputs& get_inputs() = 0;
 
   /**
    * @return OS specific handle to the window.

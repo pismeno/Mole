@@ -1,18 +1,22 @@
 #pragma once
 
-#include <resources/asset_handle.hpp>
-#include <vector>
+#include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
-#include <resources/asset_types.hpp>
-#include <osal/ifile_system.hpp>
-#include <osal/os_context.hpp>
-#include <utils/result.hpp>
-#include <utils/string_hash.hpp>
+#include "resources/asset_handle.hpp"
+#include "resources/asset_types.hpp"
+#include "utils/result.hpp"
 #include "utils/uuid.hpp"
 
 namespace mole {
+
+class IFileSystem;
+
+Result<std::vector<uint8_t>> read_asset_payload(IFileSystem* file_system, UUID uuid);
 
 class IAssetPool {
  public:
@@ -28,7 +32,7 @@ class IAssetPool {
 template<typename T>
 class AssetPool : public IAssetPool {
  public:
-  AssetPool(IFileSystem* file_system) : file_system(file_system) {};
+  AssetPool(IFileSystem* file_system) : file_system(file_system) {}
 
   Result<AssetHandle<T>> load(UUID uuid) {
     // Check if the asset is already loaded
@@ -82,17 +86,7 @@ class AssetPool : public IAssetPool {
   }
 
   Result<T> load_asset_from_file(UUID uuid) {
-    std::string filepath = "assets://" + uuid.to_string() + ".asset";
-
-    auto r_file_size = file_system->get_file_size(filepath);
-    if (!r_file_size) {
-      return mole::fail(r_file_size.error());
-    }
-
-    uint64_t header_size = sizeof(AssetHeader);
-    uint64_t payload_size = r_file_size.value() - header_size;
-
-    auto r_read_bytes = file_system->read_chunk(filepath, header_size, payload_size);
+    auto r_read_bytes = read_asset_payload(file_system, uuid);
     if (!r_read_bytes) {
       if (contains(uuid)) {
         mark_missing(uuid);
@@ -101,6 +95,7 @@ class AssetPool : public IAssetPool {
       return mole::fail(r_read_bytes.error());
     }
 
+    std::string filepath = "assets://" + uuid.to_string() + ".asset";
     return parse_asset(filepath, std::move(r_read_bytes).value());
   }
 
@@ -175,7 +170,6 @@ class AssetPool : public IAssetPool {
   }
 
  protected:
-  // 1. Declare the template method inside the class without the inline definition
   Result<T> parse_asset(std::string_view filepath, std::vector<uint8_t> raw_bytes);
 
  private:

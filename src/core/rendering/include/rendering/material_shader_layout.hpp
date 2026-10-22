@@ -1,8 +1,9 @@
 #pragma once
 
 #include <cstdint>
-#include <unordered_map>
+#include <functional>
 #include <string>
+#include <unordered_map>
 
 #include "utils/string_hash.hpp"
 
