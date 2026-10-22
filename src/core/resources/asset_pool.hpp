@@ -81,6 +81,7 @@ class AssetPool : public IAssetPool {
       return mole::fail(r_asset.error());
     }
     assets[index].asset = std::move(r_asset).value();
+    assets[index].state = AssetState::Loaded;
     assets[index].version++;
     return mole::ok();
   }

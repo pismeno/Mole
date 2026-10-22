@@ -28,6 +28,17 @@ class AssetManager {
  public:
   template <std::derived_from<Asset> T>
   Result<AssetHandle<T>> acquire(UUID uuid) {
+    auto* pool = get_pool<T>();
+
+    if (pool->contains(uuid)) {
+      return pool->load(uuid);
+    }
+
+    for (const auto& [type, other_pool] : asset_pools) {
+      if (type != T::ASSET_TYPE && other_pool->contains(uuid)) {
+        return mole::fail("Requested asset type does not match the asset type stored in the active pool");
+      }
+    }
 
     auto r_asset_header = read_asset_header("assets://" + uuid.to_string() + ".asset");
     if (!r_asset_header) {
@@ -39,7 +50,7 @@ class AssetManager {
       return mole::fail("Requested asset type does not match the asset type stored in the physical asset header");
     }
 
-    return get_pool<T>()->load(uuid);
+    return pool->load(uuid);
   }
 
   void unload(UUID uuid);
