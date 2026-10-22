@@ -20,7 +20,8 @@
 #include <rendering/packed_material_cache.hpp>
 #include <node_system/scene_factory.hpp>
 #include <node_system/render_gatherer.hpp>
-#include <editor/project_manager.hpp>
+#include <editor/states/ieditor_state.hpp>
+#include <editor/process_orchestrator.hpp>
 
 namespace mole {
 
@@ -42,9 +43,6 @@ class Editor {
   NodeSystemContext node_system_context;
   RenderingContext rendering_context;
 
-  std::unique_ptr<IWindow> window;
-  std::unique_ptr<Scene> scene;
-
   std::unique_ptr<IFileSystem> file_system;
   std::unique_ptr<AssetManager> asset_manager;
   std::unique_ptr<MaterialPool> material_pool;
@@ -56,7 +54,11 @@ class Editor {
   std::unique_ptr<IRenderer> renderer;
   std::unique_ptr<SceneFactory> scene_factory;
   std::unique_ptr<RenderGatherer> render_gatherer;
-  std::unique_ptr<ProjectManager> project_manager;
+  std::unique_ptr<ProcessOrchestrator> process_orchestrator;
+
+  std::unique_ptr<IWindow> window;
+  std::unique_ptr<Scene> scene;
+  std::unique_ptr<IEditorState> state;
 };
 
 } // mole

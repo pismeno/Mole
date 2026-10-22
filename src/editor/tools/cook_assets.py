@@ -85,7 +85,7 @@ for file_path_str in args.files:
             args.destination.mkdir(parents=True, exist_ok=True)
 
             with open(dst_tmp_path, "wb") as f_out:
-                
+                print(f"Cooking {file_path} to {dst_path}")
                 # Write dummy bytes to reserve space for the header
                 f_out.write(b'\x00' * HEADER_SIZE)
                 

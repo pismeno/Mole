@@ -27,7 +27,7 @@ class AssetManager {
   template <typename> friend class AssetHandle;
 
  public:
-  template <std::derived_from<Asset> T, typename... Args>
+  template <std::derived_from<Asset> T>
   Result<AssetHandle<T>> acquire(UUID uuid) {
 
     auto r_asset_header = read_asset_header("assets://" + uuid.to_string() + ".asset");
@@ -41,6 +41,27 @@ class AssetManager {
     }
 
     return get_pool<T>()->load(uuid);
+  }
+
+  void unload(UUID uuid);
+  void unload(UUID uuid, AssetType type);
+  template <std::derived_from<Asset> T>
+  void unload(UUID uuid) {
+    unload(uuid, T::ASSET_TYPE);
+  }
+
+  Result<void> reload(UUID uuid);
+  Result<void> reload(UUID uuid, AssetType type);
+  template <std::derived_from<Asset> T>
+  Result<void> reload(UUID uuid) {
+    return reload(uuid, T::ASSET_TYPE);
+  }
+
+  uint32_t get_version(UUID uuid);
+  uint32_t get_version(UUID uuid, AssetType type);
+  template <std::derived_from<Asset> T>
+  uint32_t get_version(UUID uuid) {
+    return get_version(uuid, T::ASSET_TYPE);
   }
 
   /**

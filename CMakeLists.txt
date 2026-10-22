@@ -24,6 +24,9 @@ set(SPIRV_CROSS_ENABLE_MSL ON CACHE BOOL "" FORCE)
 set(GLSLANG_TESTS OFF CACHE BOOL "" FORCE)
 set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
 set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
+set(REPROC++ ON CACHE BOOL "" FORCE)
+set(REPROC_TESTS OFF CACHE BOOL "" FORCE)
+set(REPROC_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 # external subdirectories
 add_subdirectory(external/glfw)
@@ -32,6 +35,7 @@ add_subdirectory(external/spirv-cross)
 add_subdirectory(external/glslang)
 add_subdirectory(external/doctest)
 add_subdirectory(external/vma-hpp)
+add_subdirectory(external/reproc)
 
 # project subdirectories
 add_subdirectory(src/core)

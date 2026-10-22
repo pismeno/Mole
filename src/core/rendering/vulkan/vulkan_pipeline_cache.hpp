@@ -18,7 +18,7 @@ class VulkanPipelineCache {
   Result<VulkanPipeline*> get(const AssetHandle<VertexShaderAsset>& vert, const AssetHandle<FragmentShaderAsset>& frag);
  private:
   std::unordered_map<CombinedShaderKey, std::unique_ptr<VulkanPipeline>, CombinedShaderKeyHash> pipelines;
-
+  std::unordered_map<CombinedShaderKey, PipelineShadersVersion, CombinedShaderKeyHash> pipeline_shaders_versions;
   VulkanSwapchain& swapchain;
   VulkanContext& vk_context;
   VulkanMaterialHandler& material_handler;

@@ -185,16 +185,97 @@ Result<std::vector<uint8_t>> WindowsFileSystem::read_chunk(std::string_view path
   return buffer;
 }
 
-Result<bool> WindowsFileSystem::exists(std::string_view path) const {
-  auto resolved = resolve(path);
+Result<void> WindowsFileSystem::remove(std::string_view virtual_path) {
+  auto resolved = resolve(virtual_path);
   if (!resolved) {
-    return fail("Failed to resolve virtual path: " + std::string(path));
+    return fail("Failed to resolve virtual path: " + std::string(virtual_path));
+  }
+
+  std::wstring wpath = utf8_to_utf16(resolved.value().string());
+  DWORD attributes = GetFileAttributesW(wpath.c_str());
+
+  if (attributes == INVALID_FILE_ATTRIBUTES) {
+    return fail("Failed to remove, path does not exist: " + resolved.value().string());
+  }
+
+  if (attributes & FILE_ATTRIBUTE_DIRECTORY) {
+    if (!RemoveDirectoryW(wpath.c_str())) {
+      return fail("Failed to remove directory: " + resolved.value().string());
+    }
+  } else {
+    if (attributes & FILE_ATTRIBUTE_READONLY) {
+      SetFileAttributesW(wpath.c_str(), attributes & ~static_cast<DWORD>(FILE_ATTRIBUTE_READONLY));
+    }
+    if (!DeleteFileW(wpath.c_str())) {
+      return fail("Failed to delete file: " + resolved.value().string());
+    }
+  }
+
+  return ok();
+}
+
+Result<void> WindowsFileSystem::make_file(std::string_view virtual_path) {
+  auto resolved = resolve(virtual_path);
+  if (!resolved) {
+    return fail("Failed to resolve virtual path: " + std::string(virtual_path));
+  }
+
+  std::wstring wpath = utf8_to_utf16(resolved.value().string());
+
+  scoped_win32_handle file(CreateFileW(
+      wpath.c_str(), GENERIC_WRITE, 0, nullptr,
+      CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr
+  ));
+
+  if (!file.is_valid()) {
+    return fail("Failed to create file: " + resolved.value().string());
+  }
+
+  return ok();
+}
+
+Result<bool> WindowsFileSystem::exists(std::string_view virtual_path) const {
+  auto resolved = resolve(virtual_path);
+  if (!resolved) {
+    return fail("Failed to resolve virtual path: " + std::string(virtual_path));
   }
 
   std::wstring wpath = utf8_to_utf16(resolved.value().string());
   DWORD attributes = GetFileAttributesW(wpath.c_str());
 
   return (attributes != INVALID_FILE_ATTRIBUTES);
+}
+
+Result<bool> WindowsFileSystem::is_file(std::string_view virtual_path) const {
+  auto resolved = resolve(virtual_path);
+  if (!resolved) {
+    return fail("Failed to resolve virtual path: " + std::string(virtual_path));
+  }
+
+  std::wstring wpath = utf8_to_utf16(resolved.value().string());
+  DWORD attributes = GetFileAttributesW(wpath.c_str());
+
+  if (attributes == INVALID_FILE_ATTRIBUTES) {
+    return false;
+  }
+
+  return (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
+Result<bool> WindowsFileSystem::is_dir(std::string_view virtual_path) const {
+  auto resolved = resolve(virtual_path);
+  if (!resolved) {
+    return fail("Failed to resolve virtual path: " + std::string(virtual_path));
+  }
+
+  std::wstring wpath = utf8_to_utf16(resolved.value().string());
+  DWORD attributes = GetFileAttributesW(wpath.c_str());
+
+  if (attributes == INVALID_FILE_ATTRIBUTES) {
+    return false;
+  }
+
+  return (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
 Result<uint64_t> WindowsFileSystem::get_file_size(std::string_view path) const {

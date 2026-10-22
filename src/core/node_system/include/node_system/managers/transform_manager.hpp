@@ -15,7 +15,7 @@
 namespace mole {
 
 using TransformIndex = uint32_t;
-inline constexpr TransformIndex invalid_transform_index = std::numeric_limits<uint32_t>::max();
+inline constexpr TransformIndex invalid_transform_index = (std::numeric_limits<uint32_t>::max)();
 
 class TransformManager : public NodeManagerBase<TransformManager> {
  public:
