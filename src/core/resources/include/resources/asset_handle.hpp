@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <limits>
 
+#include "utils/uuid.hpp"
+
 namespace mole {
 
 template <typename T> class AssetPool;
@@ -36,6 +38,9 @@ class AssetHandle {
   }
   [[nodiscard]] inline uint32_t get_index() const noexcept { return index; }
   [[nodiscard]] inline uint32_t get_generation() const noexcept { return generation; }
+
+  [[nodiscard]] UUID get_uuid() const noexcept;
+  [[nodiscard]] uint32_t get_version() const noexcept;
 
  private:
   AssetHandle(AssetPool<T>* pool, uint32_t index, uint32_t generation) noexcept;

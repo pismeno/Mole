@@ -80,6 +80,16 @@ void AssetHandle<T>::release_ref() {
   }
 }
 
+template<typename T>
+UUID AssetHandle<T>::get_uuid() const noexcept {
+  return pool->get_uuid(index);
+}
+
+template<typename T>
+uint32_t AssetHandle<T>::get_version() const noexcept {
+  return pool->get_version(index);
+}
+
 template class AssetHandle<ImageAsset>;
 template class AssetHandle<VertexShaderAsset>;
 template class AssetHandle<FragmentShaderAsset>;

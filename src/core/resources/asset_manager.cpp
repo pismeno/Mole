@@ -54,6 +54,23 @@ Result<void> AssetManager::reload(UUID uuid, AssetType type) {
   return it->second->reload(uuid);
 }
 
+uint32_t AssetManager::get_version(UUID uuid) {
+  for (auto& [type, pool] : asset_pools) {
+    if (pool->contains(uuid)) {
+      return pool->get_version(uuid);
+    }
+  }
+  return 0;
+}
+
+uint32_t AssetManager::get_version(UUID uuid, AssetType type) {
+  auto it = asset_pools.find(type);
+  if (it != asset_pools.end()) {
+    return it->second->get_version(uuid);
+  }
+  return 0;
+}
+
 Result<AssetHeader> AssetManager::read_asset_header(const std::string_view virtual_path) {
   auto r_chunk = file_system->read_chunk(virtual_path, 0, sizeof(AssetHeader));
   if (!r_chunk) {

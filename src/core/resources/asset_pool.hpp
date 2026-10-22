@@ -22,6 +22,7 @@ class IAssetPool {
   virtual Result<void> reload(UUID uuid) = 0;
   virtual bool contains(UUID uuid) const = 0;
   virtual bool is_loaded(UUID uuid) const = 0;
+  virtual uint32_t get_version(UUID uuid) const = 0;
 };
 
 template<typename T>
@@ -76,6 +77,7 @@ class AssetPool : public IAssetPool {
       return mole::fail(r_asset.error());
     }
     assets[index].asset = std::move(r_asset).value();
+    assets[index].version++;
     return mole::ok();
   }
 
@@ -105,6 +107,7 @@ class AssetPool : public IAssetPool {
       uint32_t index = it->second;
       assets[index].state = AssetState::MissingOnDisk;
       assets[index].asset = T{};
+      assets[index].version++;
     }
   }
 
@@ -129,6 +132,7 @@ class AssetPool : public IAssetPool {
     if (assets[index].ref_count == 0) {
       cache.erase(uuids[index]);
       assets[index].asset = T{};
+      assets[index].version = 0;
       assets[index].generation++;
       assets[index].state = AssetState::Unloaded;
       free_indices.push_back(index);
@@ -153,6 +157,20 @@ class AssetPool : public IAssetPool {
     return assets[index].state == AssetState::Loaded;
   }
 
+  uint32_t get_version(UUID uuid) const override {
+    auto it = cache.find(uuid);
+    if (it == cache.end()) return 0;
+    return assets[it->second].version;
+  }
+
+  UUID get_uuid(uint32_t index) const {
+    return uuids[index];
+  }
+
+  uint32_t get_version(uint32_t index) const {
+    return assets[index].version;
+  }
+
  protected:
   // 1. Declare the template method inside the class without the inline definition
   Result<T> parse_asset(std::string_view filepath, std::vector<uint8_t> raw_bytes);
@@ -168,6 +186,7 @@ class AssetPool : public IAssetPool {
     T asset;
     uint32_t generation = 1;
     uint32_t ref_count = 0;
+    uint32_t version = 0;
     AssetState state = AssetState::Loaded;
   };
 

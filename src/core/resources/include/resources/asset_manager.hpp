@@ -57,6 +57,13 @@ class AssetManager {
     return reload(uuid, T::ASSET_TYPE);
   }
 
+  uint32_t get_version(UUID uuid);
+  uint32_t get_version(UUID uuid, AssetType type);
+  template <std::derived_from<Asset> T>
+  uint32_t get_version(UUID uuid) {
+    return get_version(uuid, T::ASSET_TYPE);
+  }
+
   /**
    * @return Result containing a unique pointer to the created manager, or an error.
    */
