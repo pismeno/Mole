@@ -1,21 +1,35 @@
-#include <node_system/scene_factory.hpp>
-#include <node_system/scene.hpp>
+#include "node_system/scene_factory.hpp"
 
-#include <memory>
+#include <cassert>
 #include <functional>
+#include <memory>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
 
-#include <node_system/node_system_context.hpp>
-#include <resources/asset_manager.hpp>
-#include <resources/resources_context.hpp>
-#include <osal/os_context.hpp>
-#include <osal/ifile_system.hpp>
-#include <utils/result.hpp>
+#include "node_system/node_system_context.hpp"
+#include "node_system/scene.hpp"
+#include "osal/ifile_system.hpp"
+#include "osal/os_context.hpp"
+#include "resources/asset_handle.hpp"
+#include "resources/asset_manager.hpp"
+#include "resources/asset_types.hpp"
+#include "resources/resources_context.hpp"
+#include "utils/result.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
+
+SceneFactory::~SceneFactory() = default;
+
+void SceneFactory::register_manager_factory(std::string_view name, ManagerFactory factory) {
+  std::string s_name(name);
+  assert(manager_registry.find(s_name) == manager_registry.end() && "Manager name already registered!");
+  manager_registry[s_name] = std::move(factory);
+}
 
 Result<std::unique_ptr<SceneFactory>> SceneFactory::create(const NodeSystemContext& context) {
   auto factory = std::unique_ptr<SceneFactory>(new SceneFactory());

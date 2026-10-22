@@ -1,23 +1,22 @@
 #pragma once
 
-#include <vector>
+#include <concepts>
 #include <cstdint>
-#include <string>
-#include <string_view>
-#include <typeindex>
-#include <unordered_map>
 #include <memory>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
 
-#include <resources/asset_types.hpp>
-#include <resources/resources_context.hpp>
-#include <resources/asset_handle.hpp>
-#include <utils/string_hash.hpp>
-#include <utils/result.hpp>
+#include "resources/asset_handle.hpp"
+#include "resources/asset_pool.hpp"
+#include "resources/asset_types.hpp"
+#include "utils/result.hpp"
 #include "utils/uuid.hpp"
 
-#include "resources/asset_pool.hpp"
-
 namespace mole {
+
+class IFileSystem;
+struct ResourcesContext;
 
 /**
  * @brief Central manager for loading, caching, and retrieving assets via type-specific pools.
@@ -27,20 +26,52 @@ class AssetManager {
   template <typename> friend class AssetHandle;
 
  public:
-  template <std::derived_from<Asset> T, typename... Args>
+  template <std::derived_from<Asset> T>
   Result<AssetHandle<T>> acquire(UUID uuid) {
+    auto* pool = get_pool<T>();
 
-    auto r_asset_header = read_asset_header("project_cache://assets/" + uuid.to_string() + ".asset");
+    if (pool->contains(uuid)) {
+      return pool->load(uuid);
+    }
+
+    for (const auto& [type, other_pool] : asset_pools) {
+      if (type != T::ASSET_TYPE && other_pool->contains(uuid)) {
+        return mole::fail("Requested asset type does not match the asset type stored in the active pool");
+      }
+    }
+
+    auto r_asset_header = read_asset_header("assets://" + uuid.to_string() + ".asset");
     if (!r_asset_header) {
       return mole::fail(r_asset_header.error());
-    };
+    }
     AssetHeader header = std::move(r_asset_header).value();
 
     if (header.asset_type != T::ASSET_TYPE) {
-      return mole::fail("Requested asset type does not match the asset type stored in the physical asset header");;
+      return mole::fail("Requested asset type does not match the asset type stored in the physical asset header");
     }
 
-    return get_pool<T>()->load(uuid);
+    return pool->load(uuid);
+  }
+
+  void unload(UUID uuid);
+  void unload(UUID uuid, AssetType type);
+  template <std::derived_from<Asset> T>
+  void unload(UUID uuid) {
+    unload(uuid, T::ASSET_TYPE);
+  }
+
+  Result<void> reload(UUID uuid);
+  Result<void> reload(UUID uuid, AssetType type);
+  template <std::derived_from<Asset> T>
+  Result<void> reload(UUID uuid) {
+    return reload(uuid, T::ASSET_TYPE);
+  }
+
+  uint32_t get_version(UUID uuid);
+  uint32_t get_version(UUID uuid, AssetType type);
+  template <std::derived_from<Asset> T>
+  uint32_t get_version(UUID uuid) {
+    return get_version(uuid, T::ASSET_TYPE);
   }
 
   /**

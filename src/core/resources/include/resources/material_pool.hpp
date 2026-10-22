@@ -1,13 +1,14 @@
 #pragma once
 
-#include <unordered_map>
-#include <vector>
+#include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <vector>
 
-#include <resources/material.hpp>
+#include "resources/material.hpp"
 #include "resources/material_types.hpp"
-#include "resources/asset_pool.hpp"
 #include "utils/string_hash.hpp"
 
 namespace mole {

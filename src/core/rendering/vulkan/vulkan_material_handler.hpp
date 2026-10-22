@@ -1,23 +1,30 @@
 #pragma once
 
-#include <vulkan/vulkan_raii.hpp>
-#include <vk_mem_alloc_raii.hpp>
-#include <vector>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <unordered_map>
+#include <vector>
 
-#include "rendering/vulkan/vulkan_context.hpp"
-#include "rendering/vulkan/vulkan_memory_allocator.hpp"
-#include "rendering/rendering_context.hpp"
-#include "rendering/bindless_texture_registry.hpp"
-#include "rendering/packed_material_cache.hpp"
-#include "resources/material_types.hpp"
-#include "resources/material_pool.hpp"
+#include <vk_mem_alloc_raii.hpp>
+#include <vulkan/vulkan_raii.hpp>
+
 #include "resources/asset_handle.hpp"
 #include "resources/asset_types.hpp"
-#include "utils/result.hpp"
+#include "resources/material_types.hpp"
 #include "utils/counter.hpp"
+#include "utils/result.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
+
+class AssetManager;
+class BindlessTextureRegistry;
+class MaterialPool;
+class PackedMaterialCache;
+class VulkanContext;
+class VulkanMemoryAllocator;
+struct RenderingContext;
 
 class VulkanMaterialHandler {
  public:
@@ -30,8 +37,6 @@ class VulkanMaterialHandler {
   Result<void> update_texture_buffer();
   Result<void> prepare_materials(std::vector<MaterialID> material_ids);
   void free_unused_materials();
-  void free_material(const MaterialID& material_id);
-  void free_texture(uint64_t texture_id);
 
   inline const vk::raii::DescriptorSetLayout& get_descriptor_set_layout() const { return descriptor_set_layout; }
   inline const vk::raii::DescriptorSet& get_descriptor_set() const { return descriptor_set; }
@@ -43,23 +48,21 @@ class VulkanMaterialHandler {
       const VulkanContext& vk_context,
       const VulkanMemoryAllocator& memory_allocator,
       const Counter& frames_rendered,
-      const RenderingContext& context)
-      : frames_rendered(frames_rendered),
-        vk_context(vk_context),
-        memory_allocator(memory_allocator),
-        bindless_texture_registry(context.bindless_texture_registry),
-        material_pool(context.resources_context->material_pool),
-        packed_material_cache(context.packed_material_cache) {}
+      const RenderingContext& context);
 
   struct GpuTexture {
+    UUID asset_uuid;
     vma::raii::Image image = nullptr;
     vk::raii::ImageView view = nullptr;
+    uint32_t version = 0;
   };
 
   struct GpuMaterial {
     uint32_t slot_index;
     uint32_t shader_index;
     uint64_t last_used_on_frame;
+    uint32_t version;
+    std::vector<uint64_t> texture_ids;
   };
 
   Result<void> create_descriptor_set_layouts();
@@ -70,16 +73,27 @@ class VulkanMaterialHandler {
   Result<void> create_material_buffer();
 
   /// Allocates a primary command buffer from command_pool and begins it with eOneTimeSubmit.
-  [[nodiscard]] Result<vk::raii::CommandBuffer> allocate_upload_command_buffer();
+  Result<vk::raii::CommandBuffer> allocate_upload_command_buffer();
   /// Creates a 2D optimal tiled image via VMA with dedicated allocation.
-  [[nodiscard]] Result<vma::raii::Image> create_texture_image(const AssetHandle<ImageAsset>& asset);
+  Result<vma::raii::Image> create_texture_image(const AssetHandle<ImageAsset>& asset);
   /// Creates a standard 2D color aspect image view for the uploaded texture.
-  [[nodiscard]] Result<vk::raii::ImageView> create_texture_image_view(vk::Image image);
+  Result<vk::raii::ImageView> create_texture_image_view(vk::Image image);
+
+  struct TextureUploadPayload { uint32_t slot; AssetHandle<ImageAsset> asset; };
+
+  Result<void> upload_textures_to_gpu(const std::vector<TextureUploadPayload>& uploads);
+  Result<void> make_texture_versions_current();
+
+  Result<void> upload_material(const MaterialID& material_id);
+  Result<void> update_material(const MaterialID& material_id);
 
   uint32_t make_material_index();
 
   void add_texture_reference(uint64_t texture_id);
   void remove_texture_reference(uint64_t texture_id);
+
+  void free_material(const MaterialID& material_id);
+  void free_texture(uint64_t texture_id);
 
   vk::raii::DescriptorSetLayout descriptor_set_layout = nullptr;
   vk::raii::DescriptorPool descriptor_pool = nullptr;
@@ -104,6 +118,7 @@ class VulkanMaterialHandler {
   const VulkanMemoryAllocator& memory_allocator;
   BindlessTextureRegistry* bindless_texture_registry;
   MaterialPool* material_pool;
+  AssetManager* asset_manager;
   PackedMaterialCache* packed_material_cache;
 };
 

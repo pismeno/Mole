@@ -1,14 +1,11 @@
 #pragma once
 
-#include <string>
-#include <string_view>
-#include <source_location>
-#include <variant>
-#include <iostream>
-#include <utility>
 #include <cassert>
-#include <type_traits>
 #include <concepts>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
 
 namespace mole {
 
@@ -76,7 +73,7 @@ class [[nodiscard]] Result {
 template <>
 class [[nodiscard]] Result<void> {
  public:
-  Result() : success(true) {}
+  Result() = default;
   Result(Failure failure) : error_message(std::move(failure.message)), success(false) {}
 
   bool is_ok() const noexcept { return success; }
@@ -86,7 +83,7 @@ class [[nodiscard]] Result<void> {
 
  private:
   std::string error_message = "";
-  bool success;
+  bool success = true;
 };
 
 static inline Result<void> ok() { return Result<void>(); }

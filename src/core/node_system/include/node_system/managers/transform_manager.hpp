@@ -1,21 +1,23 @@
 #pragma once
 
-#include <node_system/inode_manager.hpp>
+#include "node_system/inode_manager.hpp"
 
-#include <vector>
 #include <cstdint>
 #include <limits>
+#include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/mat3x3.hpp>
+#include <glm/vec2.hpp>
 #include <nlohmann/json.hpp>
 
-#include <utils/result.hpp>
-#include <node_system/node_types.hpp>
+#include "node_system/node_types.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
 
 using TransformIndex = uint32_t;
-inline constexpr TransformIndex invalid_transform_index = std::numeric_limits<uint32_t>::max();
+inline constexpr TransformIndex invalid_transform_index = (std::numeric_limits<uint32_t>::max)();
 
 class TransformManager : public NodeManagerBase<TransformManager> {
  public:
@@ -77,7 +79,6 @@ class TransformManager : public NodeManagerBase<TransformManager> {
   TransformInfo* get_transform(uint32_t node_idx);
   void update_node_hierarchy(NodeID node_id, const glm::mat3& parent_global_mat);
   void mark_spatial_children_dirty(NodeID parent_id);
-
 
   void detach_from_old_logical_parent(NodeID node_id, NodeID old_parent_id) noexcept;
   void attach_to_new_logical_parent(NodeID node_id, NodeID new_parent_id) noexcept;

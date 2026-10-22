@@ -1,7 +1,11 @@
 #include "resources/asset_handle.hpp"
 
+#include <cstdint>
+#include <limits>
+
 #include "resources/asset_pool.hpp"
 #include "resources/asset_types.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
 
@@ -56,12 +60,11 @@ AssetHandle<T>& AssetHandle<T>::operator=(AssetHandle&& other) noexcept {
 template<typename T>
 bool AssetHandle<T>::is_valid() const noexcept {
   if (!pool || index == std::numeric_limits<uint32_t>::max()) return false;
-  return pool->resolve(index, generation) != nullptr;
+  return pool->is_loaded(index, generation);
 }
 
 template<typename T>
-const T* AssetHandle<T>::get() const noexcept {
-  if (!pool) return nullptr;
+const T& AssetHandle<T>::get() const noexcept {
   return pool->resolve(index, generation);
 }
 
@@ -79,6 +82,16 @@ void AssetHandle<T>::release_ref() {
     pool = nullptr;
     index = std::numeric_limits<uint32_t>::max();
   }
+}
+
+template<typename T>
+UUID AssetHandle<T>::get_uuid() const noexcept {
+  return pool->get_uuid(index);
+}
+
+template<typename T>
+uint32_t AssetHandle<T>::get_version() const noexcept {
+  return pool->get_version(index);
 }
 
 template class AssetHandle<ImageAsset>;

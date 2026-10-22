@@ -1,16 +1,18 @@
-  #pragma once
+#pragma once
 
-  #include <glm/glm.hpp>
+#include <cstdint>
 
-  #include "resources/material_types.hpp"
+#include <glm/glm.hpp>
 
-  namespace mole {
+#include "resources/material_types.hpp"
 
-  struct RenderQuadCommand {
-    glm::mat3x3 transform;
+namespace mole {
 
-    MaterialID material_id;
-    uint32_t z_index;
-  };
+struct RenderQuadCommand {
+  glm::mat3x3 transform;
 
-  } // mole
+  MaterialID material_id;
+  uint32_t z_index;
+};
+
+} // mole

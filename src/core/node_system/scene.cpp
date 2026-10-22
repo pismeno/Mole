@@ -1,17 +1,35 @@
-#include <node_system/scene.hpp>
-#include <node_system/node_types.hpp>
+#include "node_system/scene.hpp"
 
+#include <algorithm>
+#include <cstdint>
+#include <iostream>
 #include <memory>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
-#include <cstdint>
-#include <algorithm>
 
-#include <utils/result.hpp>
-#include <node_system/managers/transform_manager.hpp>
-#include <node_system/managers/drawable_manager.hpp>
+#include "node_system/inode_manager.hpp"
+#include "node_system/node.hpp"
+#include "node_system/node_types.hpp"
 
 namespace mole {
+
+Scene::Scene(std::string scene_type_name) : scene_type_name(std::move(scene_type_name)) {
+  nodes.resize(MAX_ACTIVE_NODES);
+  generations.resize(MAX_ACTIVE_NODES);
+  node_types.resize(MAX_ACTIVE_NODES);
+}
+
+Scene::~Scene() = default;
+
+INodeManager* Scene::get_manager_by_name(std::string_view type_id) const {
+  auto it = managers_map.find(type_id);
+  if (it != managers_map.end()) {
+    return it->second.get();
+  }
+  return nullptr;
+}
 
 [[nodiscard]] NodeID Scene::generate_id() {
   if (!recycled_ids.empty()) {
@@ -45,13 +63,13 @@ namespace mole {
   return nodes[node_id.index()].parent_id;
 }
 
-[[nodiscard]] const std::vector<NodeID>& Scene::get_nodes_children(NodeID node_id) const noexcept {
+[[nodiscard]] std::vector<NodeID> Scene::get_nodes_children(NodeID node_id) const noexcept {
   if (!is_node_valid(node_id)) return {};
 
   return nodes[node_id.index()].children_ids;
 }
 
-[[nodiscard]] const NodeID Scene::create_node(NodeID parent_id, std::string_view node_type) {
+[[nodiscard]] NodeID Scene::create_node(NodeID parent_id, std::string_view node_type) {
   NodeID new_id = generate_id();
 
   nodes[new_id.index()].id = new_id;
@@ -158,6 +176,7 @@ void Scene::reparent_node(NodeID node_id, NodeID new_parent_id) {
     std::cerr <<"Node with provided ID not found";
     return;
   }
+
   if (!new_parent) {
     std::cerr <<"Parent node with provided ID not found";
     return;

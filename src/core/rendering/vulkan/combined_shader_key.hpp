@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 
 namespace mole {
 
@@ -21,6 +23,20 @@ struct CombinedShaderKey {
 struct CombinedShaderKeyHash {
   std::size_t operator()(const CombinedShaderKey& k) const {
     return std::hash<uint64_t>()(k.vert_id) ^ (std::hash<uint64_t>()(k.frag_id) << 1);
+  }
+};
+
+struct PipelineShadersVersion {
+  uint32_t vert_version;
+  uint32_t frag_version;
+
+  bool operator==(const PipelineShadersVersion& other) const {
+    return vert_version == other.vert_version && frag_version == other.frag_version;
+  }
+
+  bool operator<(const PipelineShadersVersion& other) const {
+    if (vert_version != other.vert_version) return vert_version < other.vert_version;
+    return frag_version < other.frag_version;
   }
 };
 

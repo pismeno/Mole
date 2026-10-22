@@ -1,9 +1,15 @@
-#include <node_system/scene.hpp>
+#include "node_system/scene.hpp"
 
-#include <iostream>
+#include <cstdint>
+#include <string>
+#include <utility>
 
 #include <nlohmann/json.hpp>
-#include <utils/result.hpp>
+
+#include "node_system/inode_manager.hpp"
+#include "node_system/node.hpp"
+#include "node_system/node_types.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
 

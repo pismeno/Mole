@@ -1,10 +1,51 @@
 #include "rendering/vulkan/vulkan_material_handler.hpp"
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
-#include <vector>
+#include <memory>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
+#include <vector>
+
+#include <vk_mem_alloc_raii.hpp>
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_raii.hpp>
+
+#include "rendering/bindless_texture_registry.hpp"
+#include "rendering/packed_material.hpp"
+#include "rendering/packed_material_cache.hpp"
+#include "rendering/rendering_context.hpp"
+#include "rendering/vulkan/vulkan_context.hpp"
+#include "rendering/vulkan/vulkan_memory_allocator.hpp"
+#include "resources/asset_handle.hpp"
+#include "resources/asset_manager.hpp"
+#include "resources/asset_types.hpp"
+#include "resources/material.hpp"
+#include "resources/material_pool.hpp"
+#include "resources/material_types.hpp"
+#include "resources/resources_context.hpp"
+#include "utils/counter.hpp"
+#include "utils/result.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
+
+VulkanMaterialHandler::VulkanMaterialHandler(
+    const VulkanContext& vk_context,
+    const VulkanMemoryAllocator& memory_allocator,
+    const Counter& frames_rendered,
+    const RenderingContext& context)
+    : frames_rendered(frames_rendered),
+      vk_context(vk_context),
+      memory_allocator(memory_allocator),
+      bindless_texture_registry(context.bindless_texture_registry),
+      material_pool(context.resources_context->material_pool),
+      asset_manager(context.resources_context->asset_manager),
+      packed_material_cache(context.packed_material_cache) {}
 
 Result<std::unique_ptr<VulkanMaterialHandler>> VulkanMaterialHandler::create(
     const VulkanContext& vk_context,
@@ -187,33 +228,36 @@ Result<void> VulkanMaterialHandler::create_material_buffer() {
   return mole::ok();
 }
 
-Result<void> VulkanMaterialHandler::update_texture_buffer() {
-  std::vector<AssetHandle<ImageAsset>> pending = bindless_texture_registry->get_pending_texture_uploads();
-  if (pending.empty()) {
-    return mole::ok();
+Result<void> VulkanMaterialHandler::upload_textures_to_gpu(const std::vector<TextureUploadPayload>& uploads) {
+  if (uploads.empty()) {
+      return mole::ok();
   }
 
   // 1. Compute offsets and total staging allocation size
   size_t total_staging_bytes = 0;
   std::vector<size_t> staging_offsets;
-  staging_offsets.reserve(pending.size());
+  staging_offsets.reserve(uploads.size());
 
   uint32_t max_slot = allocated_textures.empty() ? 0 : static_cast<uint32_t>(allocated_textures.size() - 1);
-  for (const auto& asset : pending) {
+  for (const auto& req : uploads) {
     staging_offsets.push_back(total_staging_bytes);
-    total_staging_bytes += asset->pixel_data.size();
-    max_slot = std::max(max_slot, bindless_texture_registry->get_index(asset));
+    total_staging_bytes += req.asset->pixel_data.size();
+    max_slot = std::max(max_slot, req.slot);
   }
-  allocated_textures.resize(max_slot + 1);
+
+  // Ensure the allocated textures array is large enough
+  if (allocated_textures.size() <= max_slot) {
+    allocated_textures.resize(max_slot + 1);
+  }
 
   // 2. Stage pixel data
   auto r_staging_buf = memory_allocator.create_buffer(vk::BufferUsageFlagBits::eTransferSrc, total_staging_bytes);
   if (!r_staging_buf) return mole::fail(r_staging_buf.error());
   vma::raii::Buffer staging_buffer = std::move(r_staging_buf).value();
 
-  auto* staging_mapped = static_cast<uint8_t*>(staging_buffer.getAllocation().getInfo().pMappedData);
-  for (size_t i = 0; i < pending.size(); ++i) {
-    std::memcpy(staging_mapped + staging_offsets[i], pending[i]->pixel_data.data(), pending[i]->pixel_data.size());
+  uint8_t* staging_mapped = static_cast<uint8_t*>(staging_buffer.getAllocation().getInfo().pMappedData);
+  for (size_t i = 0; i < uploads.size(); ++i) {
+    std::memcpy(staging_mapped + staging_offsets[i], uploads[i].asset->pixel_data.data(), uploads[i].asset->pixel_data.size());
   }
 
   // 3. Allocate and begin one-time command buffer
@@ -227,14 +271,14 @@ Result<void> VulkanMaterialHandler::update_texture_buffer() {
   std::vector<vk::DescriptorImageInfo> descriptor_image_infos;
   std::vector<vk::WriteDescriptorSet>  descriptor_writes;
 
-  pre_copy_barriers.reserve(pending.size());
-  post_copy_barriers.reserve(pending.size());
-  descriptor_image_infos.reserve(pending.size());
-  descriptor_writes.reserve(pending.size());
+  pre_copy_barriers.reserve(uploads.size());
+  post_copy_barriers.reserve(uploads.size());
+  descriptor_image_infos.reserve(uploads.size());
+  descriptor_writes.reserve(uploads.size());
 
-  for (size_t i = 0; i < pending.size(); ++i) {
-    const auto& asset = pending[i];
-    uint32_t slot = bindless_texture_registry->get_index(asset);
+  for (size_t i = 0; i < uploads.size(); ++i) {
+    const auto& asset = uploads[i].asset;
+    uint32_t slot = uploads[i].slot;
 
     auto r_gpu_image = create_texture_image(asset);
     if (!r_gpu_image) return mole::fail("Failed to create GPU texture image");
@@ -244,87 +288,74 @@ Result<void> VulkanMaterialHandler::update_texture_buffer() {
     if (!r_gpu_view) return mole::fail("Failed to create texture image view");
     vk::raii::ImageView gpu_view = std::move(r_gpu_view).value();
 
-    // Inlined transition: Undefined -> TransferDstOptimal
     pre_copy_barriers.push_back(vk::ImageMemoryBarrier2{
-        .srcStageMask        = vk::PipelineStageFlagBits2::eTopOfPipe,
-        .srcAccessMask       = {},
-        .dstStageMask        = vk::PipelineStageFlagBits2::eTransfer,
-        .dstAccessMask       = vk::AccessFlagBits2::eTransferWrite,
-        .oldLayout           = vk::ImageLayout::eUndefined,
-        .newLayout           = vk::ImageLayout::eTransferDstOptimal,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image               = *gpu_image,
-        .subresourceRange    = { .aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = 1 }
+      .srcStageMask        = vk::PipelineStageFlagBits2::eTopOfPipe,
+      .srcAccessMask       = {},
+      .dstStageMask        = vk::PipelineStageFlagBits2::eTransfer,
+      .dstAccessMask       = vk::AccessFlagBits2::eTransferWrite,
+      .oldLayout           = vk::ImageLayout::eUndefined,
+      .newLayout           = vk::ImageLayout::eTransferDstOptimal,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image               = *gpu_image,
+      .subresourceRange    = { .aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = 1 }
     });
 
-    // Inlined transition: TransferDstOptimal -> ShaderReadOnlyOptimal
     post_copy_barriers.push_back(vk::ImageMemoryBarrier2{
-        .srcStageMask        = vk::PipelineStageFlagBits2::eTransfer,
-        .srcAccessMask       = vk::AccessFlagBits2::eTransferWrite,
-        .dstStageMask        = vk::PipelineStageFlagBits2::eFragmentShader,
-        .dstAccessMask       = vk::AccessFlagBits2::eShaderRead,
-        .oldLayout           = vk::ImageLayout::eTransferDstOptimal,
-        .newLayout           = vk::ImageLayout::eShaderReadOnlyOptimal,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image               = *gpu_image,
-        .subresourceRange    = { .aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = 1 }
+      .srcStageMask        = vk::PipelineStageFlagBits2::eTransfer,
+      .srcAccessMask       = vk::AccessFlagBits2::eTransferWrite,
+      .dstStageMask        = vk::PipelineStageFlagBits2::eFragmentShader,
+      .dstAccessMask       = vk::AccessFlagBits2::eShaderRead,
+      .oldLayout           = vk::ImageLayout::eTransferDstOptimal,
+      .newLayout           = vk::ImageLayout::eShaderReadOnlyOptimal,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image               = *gpu_image,
+      .subresourceRange    = { .aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = 1 }
     });
 
-    // Staging to GPU copy command
-    vk::BufferImageCopy copy_region{
-        .bufferOffset      = staging_offsets[i],
-        .bufferRowLength   = 0,
-        .bufferImageHeight = 0,
-        .imageSubresource  = { .aspectMask = vk::ImageAspectFlagBits::eColor, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
-        .imageOffset       = { 0, 0, 0 },
-        .imageExtent       = { static_cast<uint32_t>(asset->width), static_cast<uint32_t>(asset->height), 1 }
-    };
-
-    // Stash descriptor writes directly
     descriptor_image_infos.push_back({
-                                         .sampler     = *default_sampler,
-                                         .imageView   = *gpu_view,
-                                         .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
-                                     });
+      .sampler     = *default_sampler,
+      .imageView   = *gpu_view,
+      .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal
+    });
 
     descriptor_writes.push_back({
-                                    .dstSet          = *descriptor_set,
-                                    .dstBinding      = 0,
-                                    .dstArrayElement = slot,
-                                    .descriptorCount = 1,
-                                    .descriptorType  = vk::DescriptorType::eCombinedImageSampler,
-                                    .pImageInfo      = &descriptor_image_infos.back()
-                                });
+      .dstSet          = *descriptor_set,
+      .dstBinding      = 0,
+      .dstArrayElement = slot,
+      .descriptorCount = 1,
+      .descriptorType  = vk::DescriptorType::eCombinedImageSampler,
+      .pImageInfo      = &descriptor_image_infos.back()
+    });
 
+    // Store the newly created texture in the registry
     allocated_textures[slot] = GpuTexture{
-        .image = std::move(gpu_image),
-        .view  = std::move(gpu_view)
+      .asset_uuid = asset.get_uuid(),
+      .image      = std::move(gpu_image),
+      .view       = std::move(gpu_view),
+      .version    = asset_manager->get_version(asset.get_uuid())
     };
   }
 
   // 5. Batch-record barriers and copies
   cmd_buffer.pipelineBarrier2(vk::DependencyInfo{
-      .imageMemoryBarrierCount = static_cast<uint32_t>(pre_copy_barriers.size()),
-      .pImageMemoryBarriers    = pre_copy_barriers.data()
+    .imageMemoryBarrierCount = static_cast<uint32_t>(pre_copy_barriers.size()),
+    .pImageMemoryBarriers    = pre_copy_barriers.data()
   });
 
-  for (size_t i = 0; i < pending.size(); ++i) {
-    const auto& asset = pending[i];
-    uint32_t slot = bindless_texture_registry->get_index(asset);
-
+  for (size_t i = 0; i < uploads.size(); ++i) {
     vk::BufferImageCopy copy_region{
-        .bufferOffset      = staging_offsets[i],
-        .imageSubresource  = { .aspectMask = vk::ImageAspectFlagBits::eColor, .layerCount = 1 },
-        .imageExtent       = { static_cast<uint32_t>(asset->width), static_cast<uint32_t>(asset->height), 1 }
+      .bufferOffset      = staging_offsets[i],
+      .imageSubresource  = { .aspectMask = vk::ImageAspectFlagBits::eColor, .layerCount = 1 },
+      .imageExtent       = { static_cast<uint32_t>(uploads[i].asset->width), static_cast<uint32_t>(uploads[i].asset->height), 1 }
     };
-    cmd_buffer.copyBufferToImage(*staging_buffer, *allocated_textures[slot].image, vk::ImageLayout::eTransferDstOptimal, copy_region);
+    cmd_buffer.copyBufferToImage(*staging_buffer, *allocated_textures[uploads[i].slot].image, vk::ImageLayout::eTransferDstOptimal, copy_region);
   }
 
   cmd_buffer.pipelineBarrier2(vk::DependencyInfo{
-      .imageMemoryBarrierCount = static_cast<uint32_t>(post_copy_barriers.size()),
-      .pImageMemoryBarriers    = post_copy_barriers.data()
+    .imageMemoryBarrierCount = static_cast<uint32_t>(post_copy_barriers.size()),
+    .pImageMemoryBarriers    = post_copy_barriers.data()
   });
 
   // 6. Submit and wait
@@ -334,11 +365,60 @@ Result<void> VulkanMaterialHandler::update_texture_buffer() {
   vk_context.get_graphics_queue().submit(submit_info, nullptr);
   vk_context.get_graphics_queue().waitIdle();
 
-  // 7. Write descriptors and finalize
+  // 7. Write descriptors
   vk_context.get_logical_device().updateDescriptorSets(descriptor_writes, nullptr);
-  bindless_texture_registry->clear_pending_texture_uploads();
 
   return mole::ok();
+}
+
+Result<void> VulkanMaterialHandler::update_texture_buffer() {
+  auto r_make_versions_current = make_texture_versions_current();
+  if (!r_make_versions_current) return mole::fail(r_make_versions_current.error());
+
+  std::vector<AssetHandle<ImageAsset>> pending = bindless_texture_registry->get_pending_texture_uploads();
+  if (pending.empty()) {
+    return mole::ok();
+  }
+
+  std::vector<TextureUploadPayload> uploads;
+  uploads.reserve(pending.size());
+  for (const auto& asset : pending) {
+    uploads.push_back({
+      .slot = bindless_texture_registry->get_index(asset),
+      .asset = asset
+    });
+  }
+
+  auto result = upload_textures_to_gpu(uploads);
+  if (result) {
+    bindless_texture_registry->clear_pending_texture_uploads();
+  }
+
+  return result;
+}
+
+Result<void> VulkanMaterialHandler::make_texture_versions_current() {
+  std::vector<TextureUploadPayload> outdated_textures;
+
+  for (uint32_t slot = 0; slot < allocated_textures.size(); ++slot) {
+    const GpuTexture& gpu_texture = allocated_textures[slot];
+
+    uint32_t current_asset_version = asset_manager->get_version(gpu_texture.asset_uuid);
+
+    if (gpu_texture.version != current_asset_version) {
+      auto r_asset = asset_manager->acquire<ImageAsset>(gpu_texture.asset_uuid);
+      if (!r_asset) return mole::fail(r_asset.error());
+
+      AssetHandle<ImageAsset> asset = std::move(r_asset).value();
+
+      outdated_textures.push_back({
+        .slot = slot,
+        .asset = std::move(asset)
+      });
+    }
+  }
+
+  return upload_textures_to_gpu(outdated_textures);
 }
 
 Result<vk::raii::CommandBuffer> VulkanMaterialHandler::allocate_upload_command_buffer() {
@@ -396,55 +476,131 @@ Result<vk::raii::ImageView> VulkanMaterialHandler::create_texture_image_view(vk:
 Result<void> VulkanMaterialHandler::prepare_materials(std::vector<MaterialID> material_ids) {
   if (material_ids.empty()) return mole::ok();
 
-  update_texture_buffer();
-
-  std::vector<MaterialID> to_prepare;
-  to_prepare.reserve(material_ids.size());
+  std::vector<MaterialID> to_upload;
+  to_upload.reserve(material_ids.size());
+  std::vector<MaterialID> to_update;
+  to_update.reserve(material_ids.size());
 
   for (MaterialID material_id : material_ids) {
     auto it = allocated_materials.find(material_id);
     if (it == allocated_materials.end()) {
-      to_prepare.push_back(material_id);
+      to_upload.push_back(material_id);
     } else {
-      it->second.last_used_on_frame = frames_rendered.count;
-    }
-  }
-
-  std::byte* gpu_dest = static_cast<std::byte*>(material_buffer_mapped);
-
-  for (MaterialID mat_id : to_prepare) {
-    // Increase texture references
-    const Material& material = material_pool->get(mat_id);
-    for (auto& [name, property] : material.properties) {
-      if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
-        add_texture_reference(texture->get_packed_id());
+      GpuMaterial& gpu_material = it->second;
+      gpu_material.last_used_on_frame = frames_rendered.count;
+      uint32_t version = material_pool->get_version(material_id);
+      if (gpu_material.version != version) {
+        to_update.push_back(material_id);
       }
     }
-
-    auto r_packed = packed_material_cache->get(mat_id);
-    if (!r_packed) return mole::fail(r_packed.error());
-    const PackedMaterial& packed_material = r_packed.value();
-
-    if (packed_material.data.empty()) continue;
-
-    if (packed_material.data.size() > MATERIAL_STRIDE) {
-      return mole::fail("Packed material data is too large for VulkanMaterialHandler, it exceeds " + std::to_string(MATERIAL_STRIDE) + " bytes");
-    }
-
-    uint32_t slot_index = make_material_index();
-    uint32_t shader_index = (slot_index * static_cast<uint32_t>(MATERIAL_STRIDE)) / static_cast<uint32_t>(packed_material.data.size());
-
-    // Store both slot, shader index, and frame count in the map!
-    allocated_materials[mat_id] = {
-        .slot_index = slot_index,
-        .shader_index = shader_index,
-        .last_used_on_frame = frames_rendered.count
-    };
-
-    std::byte* target_address = gpu_dest + (slot_index * MATERIAL_STRIDE);
-    std::memset(target_address, 0, MATERIAL_STRIDE);
-    std::memcpy(target_address, packed_material.data.data(), packed_material.data.size());
   }
+
+  for (MaterialID mat_id : to_upload) {
+    auto r_upload = upload_material(mat_id);
+    if (!r_upload) return r_upload;
+  }
+
+  for (MaterialID mat_id : to_update) {
+    auto r_update = update_material(mat_id);
+    if (!r_update) return r_update;
+  }
+
+  auto r_update_texture_buffer = update_texture_buffer();
+  if (!r_update_texture_buffer) return r_update_texture_buffer;
+
+  return mole::ok();
+}
+
+Result<void> VulkanMaterialHandler::upload_material(const MaterialID& material_id) {
+  std::byte* gpu_dest = static_cast<std::byte*>(material_buffer_mapped);
+
+  // Increase texture references
+  std::vector<uint64_t> texture_ids;
+  const Material& material = material_pool->get(material_id);
+  for (auto& [name, property] : material.properties) {
+    if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
+      uint64_t tex_id = texture->get_packed_id();
+      add_texture_reference(tex_id);
+      texture_ids.push_back(tex_id);
+    }
+  }
+
+  auto r_packed = packed_material_cache->get(material_id);
+  if (!r_packed) return mole::fail(r_packed.error());
+  const PackedMaterial& packed_material = r_packed.value();
+
+  if (packed_material.data.empty()) return mole::ok();
+
+  if (packed_material.data.size() > MATERIAL_STRIDE) {
+    return mole::fail("Packed material data is too large for VulkanMaterialHandler, it exceeds " + std::to_string(MATERIAL_STRIDE) + " bytes");
+  }
+
+  uint32_t slot_index = make_material_index();
+  uint32_t shader_index = (slot_index * static_cast<uint32_t>(MATERIAL_STRIDE)) / static_cast<uint32_t>(packed_material.data.size());
+
+  // Store slot, shader index, frame count, version, and texture references in the map!
+  allocated_materials[material_id] = {
+      .slot_index = slot_index,
+      .shader_index = shader_index,
+      .last_used_on_frame = frames_rendered.count,
+      .version = material_pool->get_version(material_id),
+      .texture_ids = std::move(texture_ids)
+  };
+
+  std::byte* target_address = gpu_dest + (slot_index * MATERIAL_STRIDE);
+  std::memset(target_address, 0, MATERIAL_STRIDE);
+  std::memcpy(target_address, packed_material.data.data(), packed_material.data.size());
+
+  return mole::ok();
+}
+
+Result<void> VulkanMaterialHandler::update_material(const MaterialID& material_id) {
+  std::byte* gpu_dest = static_cast<std::byte*>(material_buffer_mapped);
+
+  auto it = allocated_materials.find(material_id);
+  if (it == allocated_materials.end()) {
+    return mole::fail("Material ID not found in allocated materials for update");
+  }
+  GpuMaterial& gpu_material = it->second;
+  uint32_t slot_index = gpu_material.slot_index;
+
+  std::vector<uint64_t> new_texture_ids;
+  const Material& material = material_pool->get(material_id);
+  for (auto& [name, property] : material.properties) {
+    if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
+      new_texture_ids.push_back(texture->get_packed_id());
+    }
+  }
+
+  for (uint64_t tex_id : new_texture_ids) {
+    add_texture_reference(tex_id);
+  }
+
+  for (uint64_t old_tex_id : gpu_material.texture_ids) {
+    remove_texture_reference(old_tex_id);
+  }
+
+  gpu_material.texture_ids = std::move(new_texture_ids);
+
+  auto r_packed = packed_material_cache->get(material_id);
+  if (!r_packed) return mole::fail(r_packed.error());
+  const PackedMaterial& packed_material = r_packed.value();
+
+  if (packed_material.data.empty()) return mole::ok();
+
+  if (packed_material.data.size() > MATERIAL_STRIDE) {
+    return mole::fail("Packed material data is too large for VulkanMaterialHandler, it exceeds " + std::to_string(MATERIAL_STRIDE) + " bytes");
+  }
+
+  uint32_t shader_index = (slot_index * static_cast<uint32_t>(MATERIAL_STRIDE)) / static_cast<uint32_t>(packed_material.data.size());
+
+  gpu_material.shader_index = shader_index;
+  gpu_material.last_used_on_frame = frames_rendered.count;
+  gpu_material.version = material_pool->get_version(material_id);
+
+  std::byte* target_address = gpu_dest + (slot_index * MATERIAL_STRIDE);
+  std::memset(target_address, 0, MATERIAL_STRIDE);
+  std::memcpy(target_address, packed_material.data.data(), packed_material.data.size());
 
   return mole::ok();
 }
@@ -467,15 +623,12 @@ void VulkanMaterialHandler::free_material(const MaterialID& material_id) {
   if (it != allocated_materials.end()) {
     uint32_t slot_index = it->second.slot_index;
 
+    for (uint64_t texture_id : it->second.texture_ids) {
+      remove_texture_reference(texture_id);
+    }
+
     recycled_material_indices.push_back(slot_index);
     allocated_materials.erase(it);
-  }
-
-  const Material& material = material_pool->get(material_id);
-  for (auto& [name, property] : material.properties) {
-    if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
-      remove_texture_reference(texture->get_packed_id());
-    }
   }
 }
 
@@ -502,7 +655,12 @@ void VulkanMaterialHandler::free_texture(uint64_t texture_id) {
 
   if (!r_index) return;
   uint32_t index = r_index.value();
-  allocated_textures[index] = GpuTexture{nullptr, nullptr};
+  allocated_textures[index] = GpuTexture{
+    .image = nullptr,
+    .view = nullptr,
+    .version = 0
+  };
+
   bindless_texture_registry->free_index(texture_id);
 }
 

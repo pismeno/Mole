@@ -1,15 +1,16 @@
-#include <rendering/irenderer.hpp>
+#include "rendering/irenderer.hpp"
 
-#ifdef BIRD_PLATFORM_APPLE
-#include "rendering/metal/metal_renderer.hpp"
-#endif
+#include <memory>
+#include <utility>
+
+#include "rendering/rendering_context.hpp"
+#include "utils/result.hpp"
 
 #ifdef BIRD_PLATFORM_WINDOWS
 #include "rendering/vulkan/vulkan_renderer.hpp"
+#elif defined(BIRD_PLATFORM_APPLE)
+#include "rendering/metal/metal_renderer.hpp"
 #endif
-
-#include <utils/result.hpp>
-#include <rendering/rendering_context.hpp>
 
 namespace mole {
 

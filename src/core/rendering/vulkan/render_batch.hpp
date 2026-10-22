@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "combined_shader_key.hpp"
+#include "rendering/vulkan/combined_shader_key.hpp"
 
 namespace mole {
 

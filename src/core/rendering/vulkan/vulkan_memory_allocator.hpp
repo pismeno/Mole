@@ -1,14 +1,16 @@
 #pragma once
 
 #include <memory>
+#include <span>
 
-#include <vulkan/vulkan_raii.hpp>
 #include <vk_mem_alloc_raii.hpp>
+#include <vulkan/vulkan_raii.hpp>
 
 #include "utils/result.hpp"
-#include "rendering/vulkan/vulkan_context.hpp"
 
 namespace mole {
+
+class VulkanContext;
 
 class VulkanMemoryAllocator {
  public:

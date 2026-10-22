@@ -1,6 +1,19 @@
 # About
 Mole Engine is a specialized 2d game engine.   
-**Project Status:** Early Development
+
+# Project State
+Mole engine is still in early development, however these are some of the already implemented features:
+
+- Node system (ECS-like architecture, utilizing Data-Oriented Design)
+- Material system, with custom fields, shaders
+- Vulkan renderer, capable of rendering 2d nodes from Scenes, applying materials to them
+- Generic systems like: file system, asset manager, windowing
+- Material and Asset hot-reloading
+
+# Code Examples:
+- [scene.hpp](src/core/node_system/include/node_system/scene.hpp), [scene.cpp](src/core/node_system/scene.cpp)
+- [inode_manager.hpp](src/core/node_system/include/node_system/inode_manager.hpp), [transform_manager.cpp](src/core/node_system/managers/transform_manager.cpp)
+- [iwindow.hpp](src/core/osal/include/osal/iwindow.hpp), [glfw_window.cpp](src/core/osal/windowing/glfw/glfw_window.cpp)
 
 # Goals
 ## Features of the editor for the end user
@@ -79,6 +92,8 @@ There's an abstract `IRenderer` class, which has different implementation, for n
 
 # Used libraries
 - nlohmann/json
+- e-dant/watcher
+- reproc
 - GLM
 - Vulkan
 - Metal

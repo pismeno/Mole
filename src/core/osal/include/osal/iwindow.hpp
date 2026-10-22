@@ -4,12 +4,13 @@
 #include <memory>
 #include <string>
 
-#include <osal/inputs.hpp>
-#include <utils/result.hpp>
+#include "utils/result.hpp"
 
 namespace mole {
 
-using namespace inputs;
+namespace inputs {
+class Inputs;
+}
 
 struct WindowOptions {
   uint32_t logical_width, logical_height;
@@ -46,12 +47,13 @@ class IWindow {
   [[nodiscard]] virtual uint32_t get_framebuffer_height() const = 0;
   [[nodiscard]] virtual bool is_focused() const noexcept = 0;
   [[nodiscard]] virtual bool is_fullscreen() const noexcept = 0;
+  [[nodiscard]] virtual bool is_minimized() const noexcept = 0;
   virtual void set_fullscreen(bool fullscreen) = 0;
 
   /**
    * @return Inputs object, responsible for handling input events.
    */
-  virtual Inputs& get_inputs() = 0;
+  virtual inputs::Inputs& get_inputs() = 0;
 
   /**
    * @return OS specific handle to the window.

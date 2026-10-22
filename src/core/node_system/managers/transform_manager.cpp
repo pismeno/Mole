@@ -1,7 +1,17 @@
-#include <node_system/managers/transform_manager.hpp>
+#include "node_system/managers/transform_manager.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <vector>
+
 #include <glm/glm.hpp>
+#include <glm/mat3x3.hpp>
+#include <glm/vec2.hpp>
+#include <nlohmann/json.hpp>
+
+#include "node_system/node_types.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
 

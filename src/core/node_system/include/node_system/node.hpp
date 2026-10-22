@@ -1,10 +1,8 @@
 #pragma once
 
-#include <cstdint>
 #include <vector>
-#include <string>
 
-#include "node_types.hpp"
+#include "node_system/node_types.hpp"
 
 namespace mole {
 

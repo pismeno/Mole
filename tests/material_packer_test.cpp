@@ -1,11 +1,18 @@
-#include <doctest/doctest.h>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
+#include <vector>
 
-#include "rendering/rendering_context.hpp"
-#include "rendering/material_packer.hpp"
-#include "rendering/packed_material.hpp"
-#include "rendering/material_shader_layout.hpp"
+#include <doctest/doctest.h>
+#include <glm/vec3.hpp>
+
 #include "rendering/bindless_texture_registry.hpp"
+#include "rendering/material_packer.hpp"
+#include "rendering/material_shader_layout.hpp"
+#include "rendering/packed_material.hpp"
+#include "rendering/rendering_context.hpp"
+#include "resources/asset_handle.hpp"
+#include "resources/asset_types.hpp"
 #include "resources/material.hpp"
 
 namespace mole {

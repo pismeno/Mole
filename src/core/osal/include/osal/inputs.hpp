@@ -1,8 +1,8 @@
 #pragma once
 
-#include "glm/vec2.hpp"
+#include <glm/vec2.hpp>
 
-#include "input_codes.hpp"
+#include "osal/input_codes.hpp"
 
 namespace mole::inputs {
 

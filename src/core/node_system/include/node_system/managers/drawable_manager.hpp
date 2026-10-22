@@ -1,14 +1,17 @@
 #pragma once
 
-#include <vector>
+#include "node_system/inode_manager.hpp"
+
 #include <cstdint>
-#include <limits>
+#include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/vec2.hpp>
+#include <nlohmann/json.hpp>
 
-#include <node_system/inode_manager.hpp>
-#include <node_system/node_types.hpp>
-#include <resources/material_types.hpp>
+#include "node_system/node_types.hpp"
+#include "resources/material_types.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
 
@@ -22,9 +25,7 @@ struct Drawable {
 
 class DrawableManager : public NodeManagerBase<DrawableManager> {
  public:
-  explicit DrawableManager() {
-    drawables.resize(MAX_ACTIVE_NODES, Drawable{});
-  }
+  explicit DrawableManager();
 
   static constexpr const char* TYPE_ID = "drawable_manager";
 

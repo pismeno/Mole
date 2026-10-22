@@ -1,21 +1,13 @@
 #pragma once
 
-#include <concepts>
-#include <cstddef>
-#include <string_view>
-#include <memory>
-#include <vector>
-#include <unordered_map>
 #include <string>
 
 #include <nlohmann/json.hpp>
 
-#include "node_types.hpp"
-#include <utils/result.hpp>
+#include "node_system/node_types.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
-
-using namespace mole;
 
 /**
  * @brief Base class for all node managers.

@@ -1,9 +1,14 @@
-#include <resources/asset_manager.hpp>
+#include "resources/asset_manager.hpp"
 
+#include <cstring>
 #include <memory>
+#include <string_view>
+#include <utility>
 
-#include <utils/result.hpp>
-#include <resources/resources_context.hpp>
+#include "osal/ifile_system.hpp"
+#include "osal/os_context.hpp"
+#include "resources/resources_context.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
 
@@ -19,6 +24,56 @@ Result<std::unique_ptr<AssetManager>> AssetManager::create(ResourcesContext& con
 Result<void> AssetManager::init(ResourcesContext& context) {
   file_system = context.os_context->file_system;
   return mole::ok();
+}
+
+void AssetManager::unload(UUID uuid) {
+  for (auto& [type, pool] : asset_pools) {
+    if (pool->contains(uuid)) {
+      pool->mark_missing(uuid);
+      return;
+    }
+  }
+}
+
+void AssetManager::unload(UUID uuid, AssetType type) {
+  auto it = asset_pools.find(type);
+  if (it != asset_pools.end()) {
+    it->second->mark_missing(uuid);
+  }
+}
+
+Result<void> AssetManager::reload(UUID uuid) {
+  for (auto& [type, pool] : asset_pools) {
+    if (pool->contains(uuid)) {
+      return pool->reload(uuid);
+    }
+  }
+  return mole::fail("Asset is not loaded in any active pool");
+}
+
+Result<void> AssetManager::reload(UUID uuid, AssetType type) {
+  auto it = asset_pools.find(type);
+  if (it == asset_pools.end()) {
+    return mole::fail("No pool found for asset type");
+  }
+  return it->second->reload(uuid);
+}
+
+uint32_t AssetManager::get_version(UUID uuid) {
+  for (auto& [type, pool] : asset_pools) {
+    if (pool->contains(uuid)) {
+      return pool->get_version(uuid);
+    }
+  }
+  return 0;
+}
+
+uint32_t AssetManager::get_version(UUID uuid, AssetType type) {
+  auto it = asset_pools.find(type);
+  if (it != asset_pools.end()) {
+    return it->second->get_version(uuid);
+  }
+  return 0;
 }
 
 Result<AssetHeader> AssetManager::read_asset_header(const std::string_view virtual_path) {

@@ -1,13 +1,15 @@
-#include <node_system/render_gatherer.hpp>
+#include "node_system/render_gatherer.hpp"
 
+#include <cstdint>
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/mat3x3.hpp>
 
-#include <node_system/scene.hpp>
-#include <node_system/managers/drawable_manager.hpp>
-#include <node_system/managers/transform_manager.hpp>
-#include <resources/render_commands.hpp>
+#include "node_system/managers/drawable_manager.hpp"
+#include "node_system/managers/transform_manager.hpp"
+#include "node_system/scene.hpp"
+#include "resources/render_commands.hpp"
 
 namespace mole {
 

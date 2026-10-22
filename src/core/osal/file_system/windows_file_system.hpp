@@ -1,11 +1,15 @@
 #pragma once
 
-#include <osal/ifile_system.hpp>
+#include "osal/ifile_system.hpp"
 
-#include <string_view>
-#include <vector>
 #include <cstdint>
+#include <filesystem>
+#include <string>
+#include <string_view>
 #include <unordered_map>
+#include <vector>
+
+#include "utils/result.hpp"
 
 namespace mole {
 
@@ -22,8 +26,12 @@ class WindowsFileSystem : public IFileSystem {
   Result<std::vector<uint8_t>> read_bytes(std::string_view path) override;
   Result<void> write_bytes(std::string_view path, const std::vector<uint8_t>& data) override;
   Result<std::vector<uint8_t>> read_chunk(std::string_view path, uint64_t offset, uint64_t size) override;
-  [[nodiscard]] Result<bool> exists(std::string_view path) const override;
-  [[nodiscard]] Result<uint64_t> get_file_size(std::string_view path) const override;
+  Result<void> remove(std::string_view virtual_path) override;
+  Result<void> make_file(std::string_view virtual_path) override;
+  Result<bool> exists(std::string_view virtual_path) const override;
+  Result<bool> is_file(std::string_view virtual_path) const override;
+  Result<bool> is_dir(std::string_view virtual_path) const override;
+  Result<uint64_t> get_file_size(std::string_view path) const override;
  private:
   WindowsFileSystem() = default;
 

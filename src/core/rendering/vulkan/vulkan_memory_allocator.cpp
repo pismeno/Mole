@@ -1,10 +1,15 @@
-#include "vulkan_memory_allocator.hpp"
+#include "rendering/vulkan/vulkan_memory_allocator.hpp"
 
-#include <vulkan/vulkan_raii.hpp>
+#include <cstring>
+#include <memory>
+#include <utility>
+
 #include <vk_mem_alloc_raii.hpp>
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_raii.hpp>
 
-#include "utils/result.hpp"
 #include "rendering/vulkan/vulkan_context.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
 
@@ -60,7 +65,7 @@ Result<vma::raii::Buffer> VulkanMemoryAllocator::create_buffer(vk::BufferUsageFl
   if (data != nullptr) {
     const vma::raii::Allocation& allocation = buffer.getAllocation();
     void* mapped_data = allocation.getInfo().pMappedData;
-    std::memcpy(mapped_data, data, size);
+    std::memcpy(mapped_data, data, static_cast<size_t>(size));
   }
 
   return std::move(buffer);

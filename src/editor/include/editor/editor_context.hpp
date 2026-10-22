@@ -7,7 +7,7 @@ struct RenderingContext;
 struct OSContext;
 struct ResourcesContext;
 
-
+class ProcessOrchestrator;
 /**
  * @brief Context for the editor Application layer.
  */
@@ -16,6 +16,8 @@ struct EditorContext {
   RenderingContext* rendering_context;
   OSContext* os_context;
   ResourcesContext* resources_context;
+
+  ProcessOrchestrator* process_orchestrator;
 };
 
 } // mole

@@ -1,10 +1,9 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
-#include <string_view>
 #include <string>
-#include <cstdint>
+#include <string_view>
+#include <vector>
 
 namespace mole {
 
@@ -33,7 +32,6 @@ constexpr uint32_t ASSET_CURRENT_VERSION = 1;
 
 /**
  * @brief Base class for all assets.
- *
  * All asset structs have to contain ASSET_TYPE
  */
 struct Asset {
@@ -49,7 +47,9 @@ struct ImageAsset : Asset {
 
   std::vector<uint8_t> pixel_data;
 
-  [[nodiscard]] const inline size_t get_size_bytes() const noexcept { return pixel_data.size(); };
+  [[nodiscard]] const inline size_t get_size_bytes() const noexcept { return pixel_data.size(); }
+
+  static const ImageAsset FALLBACK;
 };
 
 /**
@@ -60,48 +60,54 @@ struct BinaryAsset : Asset {
 
   std::vector<uint8_t> data;
 
-  [[nodiscard]] const inline size_t get_size_bytes() const noexcept { return data.size(); };
+  [[nodiscard]] const inline size_t get_size_bytes() const noexcept { return data.size(); }
+
+  static const BinaryAsset FALLBACK;
 };
 
 /**
  * @brief Base class for all text assets.
  */
-struct TextAsset : public BinaryAsset {
+struct TextAsset : BinaryAsset {
   static constexpr const AssetType ASSET_TYPE = AssetType::Text;
 
   [[nodiscard]] std::string_view as_string_view() const noexcept;
   [[nodiscard]] std::string as_string() const;
+
+  static const TextAsset FALLBACK;
 };
 
 /**
  * @brief Base class for all shader assets. This is not a struct to be used for actual shader assets.
  */
-struct ShaderAsset : public BinaryAsset {
+struct ShaderAsset : BinaryAsset {
   [[nodiscard]] const uint32_t* as_32bit_words() const noexcept;
 };
 
-struct VertexShaderAsset : public ShaderAsset {
+struct VertexShaderAsset : ShaderAsset {
   static constexpr const AssetType ASSET_TYPE = AssetType::VertexShader;
+  static const VertexShaderAsset FALLBACK;
 };
 
-struct FragmentShaderAsset : public ShaderAsset {
+struct FragmentShaderAsset : ShaderAsset {
   static constexpr const AssetType ASSET_TYPE = AssetType::FragmentShader;
+  static const FragmentShaderAsset FALLBACK;
 };
 
-struct ComputeShaderAsset : public ShaderAsset {
+struct ComputeShaderAsset : ShaderAsset {
   static constexpr const AssetType ASSET_TYPE = AssetType::ComputeShader;
 };
 
-struct GeometryShaderAsset : public ShaderAsset {
+struct GeometryShaderAsset : ShaderAsset {
   static constexpr const AssetType ASSET_TYPE = AssetType::GeometryShader;
 };
 
-struct TessControlShaderAsset : public ShaderAsset {
+struct TessControlShaderAsset : ShaderAsset {
   static constexpr const AssetType ASSET_TYPE = AssetType::TessControlShader;
 };
 
-struct TessEvaluationShaderAsset : public ShaderAsset {
+struct TessEvaluationShaderAsset : ShaderAsset {
   static constexpr const AssetType ASSET_TYPE = AssetType::TessEvaluationShader;
 };
 
-}
+} // mole

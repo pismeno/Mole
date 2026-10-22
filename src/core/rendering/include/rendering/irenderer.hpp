@@ -1,15 +1,16 @@
 #pragma once
 
-#include <memory>
-
 #include <cstdint>
+#include <memory>
+#include <vector>
 
-#include <rendering/rendering_context.hpp>
-#include <resources/render_commands.hpp>
-#include <resources/view_data.hpp>
-#include <utils/result.hpp>
+#include "resources/render_commands.hpp"
+#include "resources/view_data.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
+
+struct RenderingContext;
 
 enum class RendererType {
   Metal,

@@ -1,6 +1,10 @@
+#include <cstdint>
+
 #include <doctest/doctest.h>
 
+#include "resources/material.hpp"
 #include "resources/material_pool.hpp"
+#include "resources/material_types.hpp"
 
 using namespace mole;
 
