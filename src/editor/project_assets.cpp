@@ -1,6 +1,7 @@
 #include "editor/project_assets.hpp"
 
 #include <cstdint>
+#include <iostream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -90,10 +91,9 @@ Result<std::vector<UUID>> ProjectAssets::get_cooked_uuids(std::string_view path)
 
 Result<void> ProjectAssets::remove(std::string_view path) const {
   std::string asset_path = std::string("project://assets/").append(path);
-  auto r_is_file = file_system->is_file(asset_path);
 
-  if (!r_is_file || !r_is_file.value() || asset_path.ends_with(".meta")) {
-    return mole::fail("Asset path does not represent an asset");
+  if (asset_path.ends_with(".meta")) {
+    return mole::fail("Asset path '" + asset_path + "' does not represent an asset");
   }
 
   // Attempt to clean up meta file and cooked assets if meta exists
@@ -107,22 +107,26 @@ Result<void> ProjectAssets::remove(std::string_view path) const {
 
         UUID uuid = UUID::from_string(cooked_asset_recipe["uuid"].get<std::string>());
 
-        if (asset_manager) {
-          asset_manager->unload(uuid);
-        }
+        asset_manager->unload(uuid);
 
         auto r_remove_cooked = file_system->remove("assets://" + uuid.to_string() + ".asset");
-        if (!r_remove_cooked) return mole::fail(r_remove_cooked.error());
+        if (!r_remove_cooked) {
+          std::cout << "Warning: Failed to remove cooked asset '" << uuid.to_string() << "': " << r_remove_cooked.error() << std::endl;
+        }
       }
     }
 
     auto r_remove_meta = file_system->remove(asset_path + ".meta");
-    if (!r_remove_meta) return mole::fail(r_remove_meta.error());
+    if (!r_remove_meta) {
+      std::cout << "Warning: Failed to remove meta file: " << r_remove_meta.error() << std::endl;
+    }
   }
 
   // Finally, remove the asset itself
   auto r_remove_asset = file_system->remove(asset_path);
-  if (!r_remove_asset) return mole::fail(r_remove_asset.error());
+  if (!r_remove_asset) {
+    std::cout << "Warning: Failed to remove asset: " << r_remove_asset.error() << std::endl;
+  }
 
   return mole::ok();
 }

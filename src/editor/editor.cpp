@@ -224,7 +224,7 @@ Result<void> Editor::init() {
 Result<void> Editor::run() {
   using namespace inputs;
 
-  auto r_get_texture = asset_manager->acquire<ImageAsset>(UUID::from_string("8bc0a019-b4f8-446d-83ae-3ba78c59e10b"));
+  auto r_get_texture = asset_manager->acquire<ImageAsset>(UUID::from_string("0ae83afd-d8f1-462c-b529-fa38ff5ef818"));
   if (!r_get_texture) return mole::fail(r_get_texture.error());
   AssetHandle<ImageAsset> texture = std::move(r_get_texture).value();
 

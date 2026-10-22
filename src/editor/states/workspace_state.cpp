@@ -81,16 +81,24 @@ void WorkspaceState::update() {
   std::filesystem::path assets_root = project_root / "assets"; // Compare against the assets folder
 
   for (const auto& fw_event : fw_events) {
-    if (fw_event.type == FileWatchEventType::Deleted || fw_event.path.extension() == ".meta") continue;
-
-    meta_files_command.push_back(fw_event.path.string());
-    cook_command.push_back(fw_event.path.string());
+    if (fw_event.path.extension() == ".meta") continue;
 
     // 1. Strip the absolute path down to just the filename/subfolders (e.g., test.txt)
     std::filesystem::path rel_path = std::filesystem::relative(fw_event.path, assets_root);
 
     // 2. Pass just the relative path, since get_cooked_uuids is internally prepending the base assets path
     std::string path_for_uuids = rel_path.generic_string();
+
+    if (fw_event.type == FileWatchEventType::Deleted) {
+      auto r_remove = project_assets->remove(path_for_uuids);
+      if (!r_remove) {
+        std::cerr << "Failed to remove asset " << path_for_uuids << ": " << r_remove.error() << std::endl;
+      }
+      continue;
+    }
+
+    meta_files_command.push_back(fw_event.path.string());
+    cook_command.push_back(fw_event.path.string());
 
     cooked_relative_paths.push_back(path_for_uuids);
     files_added = true;
