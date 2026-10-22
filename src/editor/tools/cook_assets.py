@@ -24,7 +24,7 @@ def write_asset_header(out_file: BinaryIO, asset_type: AssetType, payload_size: 
     out_file.write(header)
 
 parser = argparse.ArgumentParser(
-    description="Batch process text or log files."
+    description="Cook assets based on .meta files of given files."
 )
 
 parser.add_argument(
@@ -65,25 +65,54 @@ for file_path_str in args.files:
         print(str(file_path) + " does not have a .meta file")
         continue
 
-    with open(meta_file_path, "r") as mf:
-        mf_json = json.loads(mf.read())
-        
-        for cooked_asset in mf_json["cooked_assets"]:
-            asset_type = AssetType(cooked_asset["type"])
-            if asset_type == AssetType.UNKNOWN:
-                print(f"Invalid asset type: {cooked_asset['type']}")
-                continue
+    try:
+        with open(meta_file_path, "r", encoding="utf-8") as mf:
+            mf_json = json.load(mf)
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
+        print(f"Skipping {file_path}: Could not read or parse meta file: {e}")
+        continue
 
-            cook_fn = cook_funcs.get(asset_type)
-            if not cook_fn:
-                print(f"No cook function for {asset_type.name}")
-                continue
+    if not isinstance(mf_json, dict):
+        print(f"Skipping {file_path}: Meta file root is not a JSON object")
+        continue
 
-            dst_path = args.destination / (cooked_asset['uuid'] + ".asset")
-            dst_tmp_path = dst_path.with_name(dst_path.name + ".tmp")
+    cooked_assets = mf_json.get("cooked_assets")
+    if not isinstance(cooked_assets, list):
+        print(f"Skipping {file_path}: 'cooked_assets' missing or not a list")
+        continue
 
-            args.destination.mkdir(parents=True, exist_ok=True)
+    for cooked_asset in cooked_assets:
+        if not isinstance(cooked_asset, dict):
+            print(f"Skipping invalid asset entry in {meta_file_path}: not an object")
+            continue
 
+        asset_uuid = cooked_asset.get("uuid")
+        if not isinstance(asset_uuid, str) or not asset_uuid.strip():
+            print(f"Skipping invalid asset entry in {meta_file_path}: missing or invalid 'uuid'")
+            continue
+
+        asset_type_val = cooked_asset.get("type")
+        try:
+            asset_type = AssetType(asset_type_val)
+        except ValueError:
+            print(f"Skipping invalid asset type '{asset_type_val}' in {meta_file_path}")
+            continue
+
+        if asset_type == AssetType.UNKNOWN:
+            print(f"Invalid asset type: UNKNOWN in {meta_file_path}")
+            continue
+
+        cook_fn = cook_funcs.get(asset_type)
+        if not cook_fn:
+            print(f"No cook function for {asset_type.name}")
+            continue
+
+        dst_path = args.destination / (asset_uuid + ".asset")
+        dst_tmp_path = dst_path.with_name(dst_path.name + ".tmp")
+
+        args.destination.mkdir(parents=True, exist_ok=True)
+
+        try:
             with open(dst_tmp_path, "wb") as f_out:
                 print(f"Cooking {file_path} to {dst_path}")
                 # Write dummy bytes to reserve space for the header
@@ -98,3 +127,7 @@ for file_path_str in args.files:
                 write_asset_header(f_out, asset_type, payload_size)
 
             os.replace(dst_tmp_path, dst_path)
+        except Exception as e:
+            print(f"Failed to cook {file_path}: {e}")
+            if dst_tmp_path.exists():
+                dst_tmp_path.unlink(missing_ok=True)

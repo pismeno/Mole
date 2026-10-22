@@ -19,7 +19,7 @@ def append_type(processed_asset_list: list[dict], old_cooked_assets: list[dict],
     })
 
 parser = argparse.ArgumentParser(
-    description="Batch process text or log files."
+    description="Generate .meta files for given files."
 )
 
 parser.add_argument(
