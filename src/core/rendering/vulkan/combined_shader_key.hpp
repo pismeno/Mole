@@ -24,4 +24,18 @@ struct CombinedShaderKeyHash {
   }
 };
 
+struct PipelineShadersVersion {
+  uint32_t vert_version;
+  uint32_t frag_version;
+
+  bool operator==(const PipelineShadersVersion& other) const {
+    return vert_version == other.vert_version && frag_version == other.frag_version;
+  }
+
+  bool operator<(const PipelineShadersVersion& other) const {
+    if (vert_version != other.vert_version) return vert_version < other.vert_version;
+    return frag_version < other.frag_version;
+  }
+};
+
 } // mole

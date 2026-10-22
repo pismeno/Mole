@@ -92,9 +92,12 @@ class AssetPool : public IAssetPool {
     uint64_t header_size = sizeof(AssetHeader);
     uint64_t payload_size = r_file_size.value() - header_size;
 
-    // Perform I/O before touching any internal index state
     auto r_read_bytes = file_system->read_chunk(filepath, header_size, payload_size);
     if (!r_read_bytes) {
+      if (contains(uuid)) {
+        mark_missing(uuid);
+      }
+
       return mole::fail(r_read_bytes.error());
     }
 
