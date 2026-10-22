@@ -30,8 +30,6 @@ class VulkanMaterialHandler {
   Result<void> update_texture_buffer();
   Result<void> prepare_materials(std::vector<MaterialID> material_ids);
   void free_unused_materials();
-  void free_material(const MaterialID& material_id);
-  void free_texture(uint64_t texture_id);
 
   inline const vk::raii::DescriptorSetLayout& get_descriptor_set_layout() const { return descriptor_set_layout; }
   inline const vk::raii::DescriptorSet& get_descriptor_set() const { return descriptor_set; }
@@ -49,11 +47,14 @@ class VulkanMaterialHandler {
         memory_allocator(memory_allocator),
         bindless_texture_registry(context.bindless_texture_registry),
         material_pool(context.resources_context->material_pool),
+        asset_manager(context.resources_context->asset_manager),
         packed_material_cache(context.packed_material_cache) {}
 
   struct GpuTexture {
+    UUID asset_uuid;
     vma::raii::Image image = nullptr;
     vk::raii::ImageView view = nullptr;
+    uint32_t version = 0;
   };
 
   struct GpuMaterial {
@@ -78,6 +79,11 @@ class VulkanMaterialHandler {
   /// Creates a standard 2D color aspect image view for the uploaded texture.
   Result<vk::raii::ImageView> create_texture_image_view(vk::Image image);
 
+  struct TextureUploadPayload { uint32_t slot; AssetHandle<ImageAsset> asset; };
+
+  Result<void> upload_textures_to_gpu(const std::vector<TextureUploadPayload>& uploads);
+  Result<void> make_texture_versions_current();
+
   Result<void> upload_material(const MaterialID& material_id);
   Result<void> update_material(const MaterialID& material_id);
 
@@ -85,6 +91,9 @@ class VulkanMaterialHandler {
 
   void add_texture_reference(uint64_t texture_id);
   void remove_texture_reference(uint64_t texture_id);
+
+  void free_material(const MaterialID& material_id);
+  void free_texture(uint64_t texture_id);
 
   vk::raii::DescriptorSetLayout descriptor_set_layout = nullptr;
   vk::raii::DescriptorPool descriptor_pool = nullptr;
@@ -109,6 +118,7 @@ class VulkanMaterialHandler {
   const VulkanMemoryAllocator& memory_allocator;
   BindlessTextureRegistry* bindless_texture_registry;
   MaterialPool* material_pool;
+  AssetManager* asset_manager;
   PackedMaterialCache* packed_material_cache;
 };
 
