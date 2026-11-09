@@ -79,4 +79,23 @@ if(WIN32)
     endif()
 
     set(ENGINE_PYTHON_EXECUTABLE "${PORTABLE_PYTHON_EXE}" CACHE FILEPATH "Engine portable python" FORCE)
+
+    message(STATUS "Generating pyrightconfig.json for static analysis...")
+    set(PYRIGHT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/pyrightconfig.json")
+
+    file(WRITE "${PYRIGHT_CONFIG_FILE}" "{
+      \"pythonVersion\": \"3.12\",
+      \"reportMissingTypeArgument\": \"warning\",
+      \"reportPrivateLocalImportUsage\": \"none\",
+      \"extraPaths\": [
+        \"${PORTABLE_SITE_PACKAGES}\",
+        \"${EDITOR_TOOLS_DIR}\"
+      ],
+      \"executionEnvironments\": [
+        {
+          \"root\": \"${EDITOR_TOOLS_DIR}\"
+        }
+      ]
+    }
+    ")
 endif()

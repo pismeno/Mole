@@ -23,11 +23,17 @@ _deps/
 *.out
 *.app
 
-# IDE - CLion
+# Python
+*__pycache__*
+
+# IDEs
 .idea/
 cmake-build-debug/
 cmake-build-release/
 .vscode/
+.zed/
+.cache/
+pyrightconfig.json
 
 # OS specific
 .DS_Store

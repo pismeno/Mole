@@ -1,0 +1,39 @@
+BasedOnStyle: Google
+Language: Cpp
+Standard: Latest
+
+# Indentation
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+AccessModifierOffset: -2
+
+# Namespaces
+NamespaceIndentation: None
+FixNamespaceComments: true
+
+# Switches & Cases
+IndentCaseLabels: true
+IndentCaseBlocks: false
+
+# Braces
+BreakBeforeBraces: Attach
+
+# Pointers and References
+PointerAlignment: Left
+
+# Preprocessor Directives
+IndentPPDirectives: None
+
+# Includes & Grouping
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+
+# Line wrapping & Spacing
+ColumnLimit: 120
+SpacesBeforeTrailingComments: 1
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyBlock: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1

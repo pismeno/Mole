@@ -1,11 +1,11 @@
-from pathlib import Path
 import argparse
-import uuid
 import json
+import uuid
+from pathlib import Path
 
 import puremagic
-
 from utils.assets import AssetType, get_meta_file_path
+
 
 def append_type(processed_asset_list: list[dict], old_cooked_assets: list[dict], type: AssetType) -> None:
     for old_asset in old_cooked_assets:
