@@ -36,7 +36,7 @@ class DrawableManager : public NodeManagerBase<DrawableManager> {
    * @param node_id ID of the node to get the draw information for.
    * @return Drawable struct tied to this node
    */
-  [[nodiscard]] inline const Drawable& get_drawable(NodeID node_id) const noexcept { return drawables[node_id.index()]; }
+  [[nodiscard]] inline const Drawable get_drawable(NodeID node_id) const noexcept { return drawables[node_id.index()]; }
 
   /**
    * Gets all the draw information of all nodes in the scene.
