@@ -1,5 +1,6 @@
 #include "editor/editor.hpp"
 
+#include <algorithm> // For std::max
 #include <chrono>
 #include <iostream>
 #include <memory>
@@ -17,6 +18,7 @@
 #include "editor/project_assets.hpp"
 #include "editor/states/workspace_state.hpp"
 #include "editor/subprocess.hpp"
+#include "node_system/managers/camera_manager.hpp"
 #include "node_system/managers/drawable_manager.hpp"
 #include "node_system/managers/transform_manager.hpp"
 #include "node_system/node_system_context.hpp"
@@ -104,6 +106,7 @@ Result<void> Editor::init() {
 
   scene_factory->register_manager<TransformManager>();
   scene_factory->register_manager<DrawableManager>();
+  scene_factory->register_manager<CameraManager>();
 
   rendering_context = {.resources_context = &resources_context};
 
@@ -169,7 +172,7 @@ Result<void> Editor::load_workspace() {
   auto r_load_node_defs = scene_factory->load_node_definitions_from(node_defs->as_string_view());
   if (!r_load_node_defs) return mole::fail(r_load_node_defs.error());
 
-  r_res_uuid = workspace_state->get_project_assets().resolve("test_img.jpg", AssetType::Image);
+  r_res_uuid = workspace_state->get_project_assets().resolve("test_img.png", AssetType::Image);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
   auto r_get_texture = asset_manager->acquire<ImageAsset>(r_res_uuid.value());
   if (!r_get_texture) return mole::fail(r_get_texture.error());
@@ -181,6 +184,7 @@ Result<void> Editor::load_workspace() {
   auto r_get_vert_shader_a = asset_manager->acquire<VertexShaderAsset>(r_res_uuid.value());
   if (!r_get_vert_shader_a) return mole::fail(r_get_vert_shader_a.error());
   AssetHandle<VertexShaderAsset> vert_shader_a = std::move(r_get_vert_shader_a).value();
+
   r_res_uuid = workspace_state->get_project_assets().resolve("mat_a.frag.glsl", AssetType::FragmentShader);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
   auto r_get_frag_shader_a = asset_manager->acquire<FragmentShaderAsset>(r_res_uuid.value());
@@ -192,6 +196,7 @@ Result<void> Editor::load_workspace() {
   auto r_get_vert_shader_b = asset_manager->acquire<VertexShaderAsset>(r_res_uuid.value());
   if (!r_get_vert_shader_b) return mole::fail(r_get_vert_shader_b.error());
   AssetHandle<VertexShaderAsset> vert_shader_b = std::move(r_get_vert_shader_b).value();
+
   r_res_uuid = workspace_state->get_project_assets().resolve("mat_b.frag.glsl", AssetType::FragmentShader);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
   auto r_get_frag_shader_b = asset_manager->acquire<FragmentShaderAsset>(r_res_uuid.value());
@@ -211,7 +216,6 @@ Result<void> Editor::load_workspace() {
                          .fragment_shader = std::move(frag_shader_b),
                      });
 
-  // Load actual scene assets after definitions loaded
   auto r_get_scene_texture =
       asset_manager->acquire<ImageAsset>(UUID::from_string("d85b0261-9ade-40c0-8f08-86546420eb96"));
   if (!r_get_scene_texture) return mole::fail(r_get_scene_texture.error());
@@ -226,12 +230,26 @@ Result<void> Editor::load_workspace() {
 
   auto* transform_manager = scene->get_manager<TransformManager>();
   auto* drawable_manager = scene->get_manager<DrawableManager>();
+  auto* camera_manager = scene->get_manager<CameraManager>();
+  assert(camera_manager != nullptr && "CameraManager was not created for this scene!");
+
+  NodeID camera_node = scene->create_node(NodeID::INVALID, "camera");
+
+  Camera cam_settings;
+  cam_settings.size = 50.0f; // View size in world units
+  cam_settings.zoom = 1.0f;
+  auto r_set_cam = camera_manager->set_camera(camera_node, cam_settings);
+  if (!r_set_cam) return r_set_cam;
+  auto r_set_cam_active = camera_manager->set_active_camera_node(camera_node);
+  if (!r_set_cam_active) return r_set_cam_active;
+
+  auto t_cam = transform_manager->set_node_position(camera_node, glm::vec2(0.0f, 0.0f));
+  if (!t_cam) return t_cam;
 
   NodeID root_node = scene->create_node(NodeID::INVALID, "sprite_2d");
   NodeID child_node1 = scene->create_node(root_node, "sprite_2d");
   NodeID child_node2 = scene->create_node(root_node, "sprite_2d");
 
-  // Cache root_node identifier so update loop can modify it
   this->root_node = root_node;
 
   auto t_1 = transform_manager->set_node_position(root_node, glm::vec2(0.0f, 0.0f));
@@ -281,7 +299,6 @@ Result<void> Editor::run() {
   while (!window->should_close()) {
     mole::ViewData view_data{};
 
-    // Only update state if it has been instantiated via 'L'
     if (state) {
       state->update();
     }
@@ -310,7 +327,6 @@ Result<void> Editor::run() {
       }
     }
 
-    // Material logic only runs if material pools have been set up by load_workspace
     if (state) {
       MaterialID test_mat_id2 = MaterialID::from(1, 0);
 
@@ -331,18 +347,62 @@ Result<void> Editor::run() {
     }
 
     float width = static_cast<float>(window->get_framebuffer_width());
-    float height = static_cast<float>(window->get_framebuffer_height());
-    float world_width = width / PPU;
-    float world_height = height / PPU;
+    float height = static_cast<float>(std::max(1u, window->get_framebuffer_height()));
 
-    view_data.projection = glm::ortho(0.0f, world_width, world_height, 0.0f, -1.0f, 1.0f);
-    view_data.view = glm::mat4(1.0f);
-    view_data.viewProjection = view_data.projection * view_data.view;
+    // --- CAMERA CALCULATION ---
+    if (scene) {
+      auto* camera_manager = scene->get_manager<CameraManager>();
+      auto* transform_manager = scene->get_manager<TransformManager>();
+
+      NodeID active_cam = camera_manager->get_active_camera_node();
+      if (active_cam != NodeID::INVALID) {
+        auto r_cam = camera_manager->get_camera(active_cam);
+        if (r_cam) {
+          Camera cam = r_cam.value();
+
+          // Dynamically adjust aspect ratio based on window size
+          cam.aspect_ratio = width / height;
+          auto r_set_cam = camera_manager->set_camera(active_cam, cam); // Write it back
+          if (!r_set_cam) return r_set_cam;
+
+          float half_h = (cam.size / cam.zoom) * 0.5f;
+          float half_w = half_h * cam.aspect_ratio;
+
+          // Vulkan projection (orthoZO), Y-axis swap applied via half_h parameters
+          view_data.projection = glm::orthoZO(-half_w, half_w, half_h, -half_h, cam.near_plane, cam.far_plane);
+
+          glm::mat4 view = glm::mat4(1.0f);
+
+          // Retrieve position from transform manager if implemented
+          glm::vec2 cam_pos{0.0f, 0.0f};
+          // Note: Adjust the exact getter name based on your TransformManager implementation
+          // if (auto r_pos = transform_manager->get_node_position(active_cam)) cam_pos = r_pos.value();
+
+          // Transform logic (Rotation would go here if needed)
+          view = glm::translate(view, glm::vec3(-cam_pos.x, -cam_pos.y, 0.0f));
+
+          view_data.view = view;
+          view_data.viewProjection = view_data.projection * view_data.view;
+        }
+      } else {
+        // Fallback if scene is loaded but no camera is active
+        float world_width = width / PPU;
+        float world_height = height / PPU;
+        view_data.projection = glm::ortho(0.0f, world_width, world_height, 0.0f, -1.0f, 1.0f);
+        view_data.view = glm::mat4(1.0f);
+        view_data.viewProjection = view_data.projection * view_data.view;
+      }
+    } else {
+      // Fallback before the workspace is loaded via 'L'
+      view_data.projection = glm::mat4(1.0f);
+      view_data.view = glm::mat4(1.0f);
+      view_data.viewProjection = glm::mat4(1.0f);
+    }
+    // --------------------------
 
     renderer->begin_frame();
     renderer->begin_pass(view_data);
 
-    // Only render scene if it has been instantiated
     if (scene) {
       renderer->submit(node_system_context.render_gatherer->gather_render_commands(*scene));
     }
@@ -387,4 +447,4 @@ Result<void> Editor::shutdown() {
   return mole::ok();
 }
 
-} // namespace mole
+} // mole

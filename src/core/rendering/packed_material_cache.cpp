@@ -29,6 +29,9 @@ Result<PackedMaterial> PackedMaterialCache::get(MaterialID material_id) {
   uint32_t index = material_id.index();
   uint32_t pool_generation = material_id.generation();
   uint32_t pool_version = material_pool->get_version(material_id);
+  const Material& material = material_pool->get(material_id);
+  uint32_t vert_version = material.vertex_shader.get_version();
+  uint32_t frag_version = material.fragment_shader.get_version();
 
   if (index >= cache.size()) {
     cache.resize(index + 1);
@@ -36,9 +39,8 @@ Result<PackedMaterial> PackedMaterialCache::get(MaterialID material_id) {
 
   CacheEntry& entry = cache[index];
 
-  if (!entry.is_valid || entry.generation != pool_generation || entry.version < pool_version) {
-    const Material& material = material_pool->get(material_id);
-
+  if (!entry.is_valid || entry.generation != pool_generation || entry.version < pool_version ||
+      entry.vert_shader_version < vert_version || entry.frag_shader_version < frag_version) {
     auto r_get_layout = material_shader_layout_registry->get(material.fragment_shader);
     if (!r_get_layout) return mole::fail(r_get_layout.error());
     MaterialShaderLayout layout = std::move(r_get_layout).value();
@@ -46,10 +48,12 @@ Result<PackedMaterial> PackedMaterialCache::get(MaterialID material_id) {
     entry.packed_data = material_packer->pack(material, layout);
     entry.generation = pool_generation;
     entry.version = pool_version;
+    entry.vert_shader_version = vert_version;
+    entry.frag_shader_version = frag_version;
     entry.is_valid = true;
   }
 
   return entry.packed_data;
 }
 
-} // mole
+} // namespace mole

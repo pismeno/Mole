@@ -16,21 +16,26 @@ class MaterialShaderLayoutReflector;
 struct RenderingContext;
 
 class MaterialShaderLayoutRegistry {
- public:
+public:
   explicit MaterialShaderLayoutRegistry(const RenderingContext& context);
   ~MaterialShaderLayoutRegistry();
 
-  Result<MaterialShaderLayout> get(uint64_t shader_id, const uint32_t* spirv_words, size_t size_bytes);
+  Result<MaterialShaderLayout> get(uint64_t shader_id, uint32_t shader_version, const uint32_t* spirv_words,
+                                   size_t size_bytes);
 
   template <typename A>
-  requires (std::derived_from<A, ShaderAsset>)
+    requires(std::derived_from<A, ShaderAsset>)
   Result<MaterialShaderLayout> get(const AssetHandle<A>& shader) {
-    return get(shader.get_packed_id(), shader->as_32bit_words(), shader->get_size_bytes());
+    return get(shader.get_packed_id(), shader.get_version(), shader->as_32bit_words(), shader->get_size_bytes());
   }
 
- private:
-  std::unordered_map<uint64_t, MaterialShaderLayout> material_shader_layouts;
+private:
+  struct CachedLayout {
+    uint32_t version = 0;
+    MaterialShaderLayout layout;
+  };
+  std::unordered_map<uint64_t, CachedLayout> material_shader_layouts;
   MaterialShaderLayoutReflector* material_shader_layout_reflector = nullptr;
 };
 
-} // mole
+} // namespace mole

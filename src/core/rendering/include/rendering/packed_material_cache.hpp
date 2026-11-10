@@ -15,16 +15,19 @@ class MaterialShaderLayoutRegistry;
 struct RenderingContext;
 
 class PackedMaterialCache {
- public:
+public:
   explicit PackedMaterialCache(RenderingContext& context);
   ~PackedMaterialCache() = default;
 
   Result<PackedMaterial> get(MaterialID material_id);
- private:
+
+private:
   struct CacheEntry {
     PackedMaterial packed_data;
     uint32_t generation = 0;
     uint32_t version = 0;
+    uint32_t vert_shader_version = 0;
+    uint32_t frag_shader_version = 0;
     bool is_valid = false;
   };
 
@@ -35,4 +38,4 @@ class PackedMaterialCache {
   MaterialPool* material_pool = nullptr;
 };
 
-} // mole
+} // namespace mole

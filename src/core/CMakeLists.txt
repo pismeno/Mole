@@ -97,6 +97,7 @@ target_sources(MoleNodeSystem
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/scene_serde.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/managers/drawable_manager.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/managers/transform_manager.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/node_system/managers/camera_manager.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/inode_manager.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/node.hpp
@@ -106,6 +107,8 @@ target_sources(MoleNodeSystem
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/scene_factory.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/managers/drawable_manager.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/managers/transform_manager.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/managers/camera_manager.hpp
+      
 )
 
 target_include_directories(MoleNodeSystem PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include)

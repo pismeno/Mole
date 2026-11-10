@@ -16,19 +16,19 @@ MaterialShaderLayoutRegistry::MaterialShaderLayoutRegistry(const RenderingContex
 
 MaterialShaderLayoutRegistry::~MaterialShaderLayoutRegistry() = default;
 
-Result<MaterialShaderLayout> MaterialShaderLayoutRegistry::get(
-    uint64_t shader_id, const uint32_t* spirv_words, size_t size_bytes) {
+Result<MaterialShaderLayout> MaterialShaderLayoutRegistry::get(uint64_t shader_id, uint32_t shader_version,
+                                                               const uint32_t* spirv_words, size_t size_bytes) {
   auto it = material_shader_layouts.find(shader_id);
-  if (it != material_shader_layouts.end()) {
-    return it->second;
+  if (it != material_shader_layouts.end() && it->second.version == shader_version) {
+    return it->second.layout;
   }
 
   auto r_reflect = material_shader_layout_reflector->reflect(spirv_words, size_bytes);
   if (!r_reflect) return r_reflect;
 
-  material_shader_layouts[shader_id] = std::move(r_reflect).value();
-  return material_shader_layouts[shader_id];
+  CachedLayout cached{.version = shader_version, .layout = std::move(r_reflect).value()};
+  material_shader_layouts[shader_id] = cached;
+  return material_shader_layouts[shader_id].layout;
 }
 
-} // mole
-
+} // namespace mole

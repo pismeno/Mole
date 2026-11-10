@@ -27,7 +27,7 @@ class VulkanMemoryAllocator;
 struct RenderingContext;
 
 class VulkanMaterialHandler {
- public:
+public:
   static inline constexpr size_t MATERIAL_STRIDE = 128;
   static inline constexpr size_t MAX_MATERIALS = 1000;
   static inline constexpr uint64_t FREE_MATERIAL_AFTER_FRAMES = 144 * 60;
@@ -42,13 +42,14 @@ class VulkanMaterialHandler {
   inline const vk::raii::DescriptorSet& get_descriptor_set() const { return descriptor_set; }
   Result<uint32_t> get_material_index(const MaterialID& material_id) const;
 
-  static Result<std::unique_ptr<VulkanMaterialHandler>> create(const VulkanContext& vk_context, VulkanMemoryAllocator& memory_allocator, const Counter& frame_counter, const RenderingContext& context);
- private:
-  explicit VulkanMaterialHandler(
-      const VulkanContext& vk_context,
-      const VulkanMemoryAllocator& memory_allocator,
-      const Counter& frames_rendered,
-      const RenderingContext& context);
+  static Result<std::unique_ptr<VulkanMaterialHandler>> create(const VulkanContext& vk_context,
+                                                               VulkanMemoryAllocator& memory_allocator,
+                                                               const Counter& frame_counter,
+                                                               const RenderingContext& context);
+
+private:
+  explicit VulkanMaterialHandler(const VulkanContext& vk_context, const VulkanMemoryAllocator& memory_allocator,
+                                 const Counter& frames_rendered, const RenderingContext& context);
 
   struct GpuTexture {
     UUID asset_uuid;
@@ -62,6 +63,8 @@ class VulkanMaterialHandler {
     uint32_t shader_index;
     uint64_t last_used_on_frame;
     uint32_t version;
+    uint32_t vert_shader_version;
+    uint32_t frag_shader_version;
     std::vector<uint64_t> texture_ids;
   };
 
@@ -79,7 +82,10 @@ class VulkanMaterialHandler {
   /// Creates a standard 2D color aspect image view for the uploaded texture.
   Result<vk::raii::ImageView> create_texture_image_view(vk::Image image);
 
-  struct TextureUploadPayload { uint32_t slot; AssetHandle<ImageAsset> asset; };
+  struct TextureUploadPayload {
+    uint32_t slot;
+    AssetHandle<ImageAsset> asset;
+  };
 
   Result<void> upload_textures_to_gpu(const std::vector<TextureUploadPayload>& uploads);
   Result<void> make_texture_versions_current();
@@ -122,4 +128,4 @@ class VulkanMaterialHandler {
   PackedMaterialCache* packed_material_cache;
 };
 
-} // mole
+} // namespace mole
