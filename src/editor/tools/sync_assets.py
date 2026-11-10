@@ -30,13 +30,44 @@ for meta_path in args.inspect_destination.rglob("*.meta"):
         print(f"Deleting lone .meta file '{meta_path}'")
         meta_path.unlink()
 
-# Find existing assets that are missing .meta files
+# Find existing assets that are missing .meta files or whose cooked assets are missing
+to_cook: list[str] = []
+
 for path in args.inspect_destination.rglob("*"):
     if not path.is_file() or is_meta_file(path):
         continue
 
-    if not get_meta_file_path(path).is_file():
+    meta_path = get_meta_file_path(path)
+    if not meta_path.is_file():
         to_gen_meta.append(str(path))
+        to_cook.append(str(path))
+    else:
+        # Check if all cooked assets for this file exist in cook_destination
+        try:
+            with open(meta_path, "r", encoding="utf-8") as mf:
+                mf_json = json.load(mf)
+        except Exception:
+            mf_json = {}
+        
+        cooked_assets = mf_json.get("cooked_assets") if isinstance(mf_json, dict) else []
+        missing_cooked = False
+        if not cooked_assets:
+            missing_cooked = True
+        else:
+            for cooked_asset in cooked_assets:
+                if isinstance(cooked_asset, dict):
+                    asset_uuid = cooked_asset.get("uuid")
+                    if asset_uuid:
+                        asset_file = args.cook_destination / f"{asset_uuid}.asset"
+                        if not asset_file.is_file():
+                            missing_cooked = True
+                            break
+                    else:
+                        missing_cooked = True
+                        break
+        
+        if missing_cooked:
+            to_cook.append(str(path))
 
 # Run gen_asset_meta_files.py only if there are assets missing metadata
 if to_gen_meta:
@@ -53,8 +84,9 @@ if to_gen_meta:
         print(f"gen_asset_meta_files.py failed (exit {e.returncode}):\n{e.stderr}")
         sys.exit(e.returncode)
 
-    cook_args = [str(args.cook_destination)] + to_gen_meta
-    print("Calling cook_assets.py for newly generated assets")
+if to_cook:
+    cook_args = [str(args.cook_destination)] + to_cook
+    print(f"Calling cook_assets.py for {len(to_cook)} assets")
     try:
         result = subprocess.run(
             [sys.executable, str(COOK_ASSETS_SCRIPT), *cook_args],
