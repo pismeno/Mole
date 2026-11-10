@@ -1,6 +1,7 @@
 #pragma once
 
 #include "editor/states/ieditor_state.hpp"
+#include "editor/subprocess.hpp"
 
 #include <memory>
 #include <vector>
@@ -19,7 +20,7 @@ class ProjectAssets;
 class Subprocess;
 
 class WorkspaceState : public IEditorState {
- public:
+public:
   ~WorkspaceState() override;
 
   void update() override;
@@ -29,7 +30,7 @@ class WorkspaceState : public IEditorState {
 
   static Result<std::unique_ptr<WorkspaceState>> create(std::unique_ptr<Project> project, const EditorContext& context);
 
- private:
+private:
   explicit WorkspaceState(std::unique_ptr<Project> project);
 
   std::vector<std::unique_ptr<Subprocess>> active_processes;
@@ -43,4 +44,4 @@ class WorkspaceState : public IEditorState {
   ProcessOrchestrator* process_orchestrator;
 };
 
-} // mole
+} // namespace mole

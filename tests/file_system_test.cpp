@@ -103,23 +103,45 @@ TEST_CASE("WindowsFileSystem: exists, is_file, and is_dir") {
     auto r_exists = fs->exists("test://test_file.txt");
     REQUIRE(r_exists.is_ok());
     CHECK(r_exists.value() == false);
-
-    // Remove existing directory
-    auto r_rem_dir = fs->remove("test://subdir");
-    REQUIRE(r_rem_dir.is_ok());
-
-    auto r_dir_exists = fs->exists("test://subdir");
-    REQUIRE(r_dir_exists.is_ok());
-    CHECK(r_dir_exists.value() == false);
-
-    // Remove non-existent path
-    auto r_rem_missing = fs->remove("test://nonexistent_path");
-    CHECK_FALSE(r_rem_missing.is_ok());
-
-    // Remove with invalid prefix
-    auto r_invalid_prefix = fs->remove("unmounted://some_file.txt");
-    CHECK_FALSE(r_invalid_prefix.is_ok());
   }
+
+  SUBCASE("exe:// default mount and get_executable_dir checks") {
+    std::filesystem::path exe_dir = fs->get_executable_dir();
+    CHECK_FALSE(exe_dir.empty());
+
+    auto resolved_exe = fs->resolve("exe://");
+    REQUIRE(resolved_exe.is_ok());
+    CHECK(resolved_exe.value() == exe_dir);
+
+    std::filesystem::path sub_dir = exe_dir / "test_subdir";
+    std::filesystem::create_directories(sub_dir);
+    fs->mount("sub", sub_dir);
+
+    auto r_mount_virt = fs->mount_from_virtual("virt_test", "sub://");
+    REQUIRE(r_mount_virt.is_ok());
+
+    auto resolved_virt = fs->resolve("virt_test://test_file.txt");
+    REQUIRE(resolved_virt.is_ok());
+    CHECK(resolved_virt.value() == sub_dir / "test_file.txt");
+
+    std::filesystem::remove_all(sub_dir);
+  }
+
+  // Remove existing directory
+  auto r_rem_dir = fs->remove("test://subdir");
+  REQUIRE(r_rem_dir.is_ok());
+
+  auto r_dir_exists = fs->exists("test://subdir");
+  REQUIRE(r_dir_exists.is_ok());
+  CHECK(r_dir_exists.value() == false);
+
+  // Remove non-existent path
+  auto r_rem_missing = fs->remove("test://nonexistent_path");
+  CHECK_FALSE(r_rem_missing.is_ok());
+
+  // Remove with invalid prefix
+  auto r_invalid_prefix = fs->remove("unmounted://some_file.txt");
+  CHECK_FALSE(r_invalid_prefix.is_ok());
 
   // Cleanup
   std::error_code ec;

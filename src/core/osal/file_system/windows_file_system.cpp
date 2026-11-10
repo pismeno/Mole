@@ -16,7 +16,7 @@ namespace mole {
 namespace {
 // Internal helper for RAII handle management, hidden in anonymous namespace
 class scoped_win32_handle {
- public:
+public:
   explicit scoped_win32_handle(HANDLE raw_handle) : handle(raw_handle) {}
 
   ~scoped_win32_handle() {
@@ -28,7 +28,7 @@ class scoped_win32_handle {
   HANDLE get() const { return handle; }
   bool is_valid() const { return handle != INVALID_HANDLE_VALUE; }
 
- private:
+private:
   HANDLE handle;
 };
 
@@ -36,11 +36,9 @@ class scoped_win32_handle {
 std::wstring utf8_to_utf16(std::string_view utf8_str) {
   if (utf8_str.empty()) return {};
 
-  int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8_str.data(),
-                                        static_cast<int>(utf8_str.size()), nullptr, 0);
+  int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8_str.data(), static_cast<int>(utf8_str.size()), nullptr, 0);
   std::wstring result(size_needed, 0);
-  MultiByteToWideChar(CP_UTF8, 0, utf8_str.data(),
-                      static_cast<int>(utf8_str.size()), result.data(), size_needed);
+  MultiByteToWideChar(CP_UTF8, 0, utf8_str.data(), static_cast<int>(utf8_str.size()), result.data(), size_needed);
 
   return result;
 }
@@ -57,14 +55,46 @@ Result<std::filesystem::path> WindowsFileSystem::resolve(std::string_view virtua
   std::string_view relative_path = virtual_path.substr(delim_pos + 3);
 
   if (auto it = mount_points.find(prefix); it != mount_points.end()) {
+    if (relative_path.empty()) {
+      return it->second;
+    }
     return it->second / relative_path;
   }
 
   return mole::fail("No mount point for prefix: " + prefix);
 }
 
+std::filesystem::path WindowsFileSystem::get_executable_dir() const {
+  std::vector<wchar_t> buffer(MAX_PATH);
+  while (true) {
+    DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+    if (length == 0) {
+      return std::filesystem::current_path();
+    }
+    if (length < buffer.size()) {
+      std::filesystem::path exe_path(buffer.data());
+      return exe_path.parent_path();
+    }
+    buffer.resize(buffer.size() * 2);
+  }
+}
+
+WindowsFileSystem::WindowsFileSystem() {
+  std::filesystem::path exe_dir = get_executable_dir();
+  mount_points["exe"] = std::filesystem::absolute(exe_dir);
+}
+
 void WindowsFileSystem::mount(std::string_view prefix, const std::filesystem::path& physical_path) {
   mount_points[std::string(prefix)] = std::filesystem::absolute(physical_path);
+}
+
+Result<void> WindowsFileSystem::mount_from_virtual(std::string_view prefix, std::string_view virtual_path) {
+  auto resolved = resolve(virtual_path);
+  if (!resolved) {
+    return fail("Failed to resolve virtual path for mounting: " + std::string(virtual_path));
+  }
+  mount_points[std::string(prefix)] = std::filesystem::absolute(resolved.value());
+  return ok();
 }
 
 Result<std::vector<uint8_t>> WindowsFileSystem::read_bytes(std::string_view path) {
@@ -75,10 +105,8 @@ Result<std::vector<uint8_t>> WindowsFileSystem::read_bytes(std::string_view path
 
   std::wstring wpath = utf8_to_utf16(resolved.value().string());
 
-  scoped_win32_handle file(CreateFileW(
-      wpath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
-      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, nullptr
-  ));
+  scoped_win32_handle file(CreateFileW(wpath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                                       FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, nullptr));
 
   if (!file.is_valid()) {
     return fail("Failed to open file for reading: " + resolved.value().string());
@@ -116,10 +144,8 @@ Result<void> WindowsFileSystem::write_bytes(std::string_view path, const std::ve
 
   std::wstring wpath = utf8_to_utf16(resolved.value().string());
 
-  scoped_win32_handle file(CreateFileW(
-      wpath.c_str(), GENERIC_WRITE, 0, nullptr,
-      CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr
-  ));
+  scoped_win32_handle file(
+      CreateFileW(wpath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
 
   if (!file.is_valid()) {
     return fail("Failed to open file for writing: " + resolved.value().string());
@@ -149,10 +175,8 @@ Result<std::vector<uint8_t>> WindowsFileSystem::read_chunk(std::string_view path
 
   std::wstring wpath = utf8_to_utf16(resolved.value().string());
 
-  scoped_win32_handle file(CreateFileW(
-      wpath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
-      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, nullptr
-  ));
+  scoped_win32_handle file(CreateFileW(wpath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                                       FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, nullptr));
 
   if (!file.is_valid()) {
     return fail("Failed to open file for chunk reading: " + resolved.value().string());
@@ -228,10 +252,8 @@ Result<void> WindowsFileSystem::make_file(std::string_view virtual_path) {
 
   std::wstring wpath = utf8_to_utf16(resolved.value().string());
 
-  scoped_win32_handle file(CreateFileW(
-      wpath.c_str(), GENERIC_WRITE, 0, nullptr,
-      CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr
-  ));
+  scoped_win32_handle file(
+      CreateFileW(wpath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
 
   if (!file.is_valid()) {
     return fail("Failed to create file: " + resolved.value().string());
@@ -304,4 +326,4 @@ Result<uint64_t> WindowsFileSystem::get_file_size(std::string_view path) const {
   return static_cast<uint64_t>(size.QuadPart);
 }
 
-} // mole
+} // namespace mole

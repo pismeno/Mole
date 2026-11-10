@@ -13,7 +13,6 @@
 #include "editor/process_orchestrator.hpp"
 #include "editor/project.hpp"
 #include "editor/project_assets.hpp"
-#include "editor/subprocess.hpp"
 #include "osal/ifile_system.hpp"
 #include "osal/os_context.hpp"
 #include "resources/asset_manager.hpp"
@@ -24,20 +23,14 @@
 namespace mole {
 
 WorkspaceState::WorkspaceState(std::unique_ptr<Project> project)
-    : project(std::move(project)),
-      file_system(nullptr),
-      asset_manager(nullptr),
-      process_orchestrator(nullptr) {}
+    : project(std::move(project)), file_system(nullptr), asset_manager(nullptr), process_orchestrator(nullptr) {}
 
-const Project& WorkspaceState::get_project() const {
-  return *project;
-}
+const Project& WorkspaceState::get_project() const { return *project; }
 
-const ProjectAssets& WorkspaceState::get_project_assets() const {
-  return *project_assets;
-}
+const ProjectAssets& WorkspaceState::get_project_assets() const { return *project_assets; }
 
-Result<std::unique_ptr<WorkspaceState>> WorkspaceState::create(std::unique_ptr<Project> project, const EditorContext& context) {
+Result<std::unique_ptr<WorkspaceState>> WorkspaceState::create(std::unique_ptr<Project> project,
+                                                               const EditorContext& context) {
   std::unique_ptr<WorkspaceState> state(new WorkspaceState(std::move(project)));
 
   state->project_assets = std::make_unique<ProjectAssets>(context);
@@ -47,18 +40,29 @@ Result<std::unique_ptr<WorkspaceState>> WorkspaceState::create(std::unique_ptr<P
 
   std::filesystem::path project_location = state->project->get_location();
   state->file_system->mount("project", project_location);
-  state->file_system->mount("assets",  project_location / "cache");
+  state->file_system->mount("assets", project_location / "cache");
 
   auto r_create_file_watcher = FileWatcher::create("project://assets/", context);
   if (!r_create_file_watcher) return mole::fail(r_create_file_watcher.error());
   state->assets_file_watcher = std::move(r_create_file_watcher).value();
 
+  auto r_python_path = state->file_system->resolve("exe://../../tools/python/python.exe");
+  if (!r_python_path) return mole::fail("Failed to resolve python interpreter: " + r_python_path.error());
+
+  auto r_sync_script = state->file_system->resolve("exe://../../../../src/editor/tools/sync_assets.py");
+  if (!r_sync_script) return mole::fail("Failed to resolve sync_assets.py: " + r_sync_script.error());
+
+  auto r_spawn_sync = state->process_orchestrator->spawn(
+      {r_python_path.value().generic_string(), r_sync_script.value().generic_string(),
+       (project_location / "assets").generic_string(), (project_location / "cache").generic_string()});
+  if (!r_spawn_sync) return mole::fail("Failed to spawn sync_assets.py: " + r_spawn_sync.error());
+
+  state->process_orchestrator->flush_and_wait(); // wait for asset sync before continuing
+
   return std::move(state);
 }
 
-WorkspaceState::~WorkspaceState() {
-  process_orchestrator->flush_and_wait();
-}
+WorkspaceState::~WorkspaceState() { process_orchestrator->flush_and_wait(); }
 
 void WorkspaceState::update() {
   auto fw_events = assets_file_watcher->poll_events();
@@ -70,8 +74,28 @@ void WorkspaceState::update() {
   // ONLY start the process if files actually changed
   if (fw_events.empty()) return;
 
-  std::vector<std::string> meta_files_command = {"../../tools/python/python.exe", "../../../src/editor/tools/gen_asset_meta_files.py"};
-  std::vector<std::string> cook_command = {"../../tools/python/python.exe", "../../../src/editor/tools/cook_assets.py", cache_path.string()};
+  auto r_python_path = file_system->resolve("exe://../../tools/python/python.exe");
+  if (!r_python_path) {
+    std::cerr << "Failed to resolve python interpreter: " << r_python_path.error() << std::endl;
+    return;
+  }
+
+  auto r_meta_script = file_system->resolve("exe://../../../../src/editor/tools/gen_asset_meta_files.py");
+  if (!r_meta_script) {
+    std::cerr << "Failed to resolve gen_asset_meta_files.py: " << r_meta_script.error() << std::endl;
+    return;
+  }
+
+  auto r_cook_script = file_system->resolve("exe://../../../../src/editor/tools/cook_assets.py");
+  if (!r_cook_script) {
+    std::cerr << "Failed to resolve cook_assets.py: " << r_cook_script.error() << std::endl;
+    return;
+  }
+
+  std::vector<std::string> meta_files_command = {r_python_path.value().generic_string(),
+                                                 r_meta_script.value().generic_string()};
+  std::vector<std::string> cook_command = {r_python_path.value().generic_string(),
+                                           r_cook_script.value().generic_string(), cache_path.string()};
 
   bool files_added = false;
   std::vector<std::string> cooked_relative_paths;
@@ -106,37 +130,37 @@ void WorkspaceState::update() {
 
   if (files_added) {
     // Capture cooked_relative_paths by value so the async callbacks can safely access it later
-    auto r_gen_meta_files_process = process_orchestrator->spawn(meta_files_command, [this, cook_command, cooked_relative_paths] {
-      auto r_cook_assets_process = process_orchestrator->spawn(cook_command, [this, cooked_relative_paths] {
+    auto r_gen_meta_files_process =
+        process_orchestrator->spawn(meta_files_command, [this, cook_command, cooked_relative_paths] {
+          auto r_cook_assets_process = process_orchestrator->spawn(cook_command, [this, cooked_relative_paths] {
+            // Loop through the paths for the assets we just cooked
+            for (const std::string& rel_path : cooked_relative_paths) {
+              auto r_get_cooked_uuids = project_assets->get_cooked_uuids(rel_path);
 
-        // Loop through the paths for the assets we just cooked
-        for (const std::string& rel_path : cooked_relative_paths) {
-          auto r_get_cooked_uuids = project_assets->get_cooked_uuids(rel_path);
+              if (!r_get_cooked_uuids) {
+                std::cerr << "Failed to get cooked UUIDs for " << rel_path << ": " << r_get_cooked_uuids.error()
+                          << std::endl;
+                continue;
+              }
 
-          if (!r_get_cooked_uuids) {
-            std::cerr << "Failed to get cooked UUIDs for " << rel_path << ": " << r_get_cooked_uuids.error() << std::endl;
-            continue;
-          }
-
-          for (const UUID& uuid : r_get_cooked_uuids.value()) {
-            auto r_reload = asset_manager->reload(uuid);
-            if (!r_reload) {
-              std::cerr << "Failed to reload asset " << uuid.to_string() << ": " << r_reload.error() << std::endl;
-            } else {
-              std::cout << "Reloaded asset " << uuid.to_string() << std::endl;
+              for (const UUID& uuid : r_get_cooked_uuids.value()) {
+                auto r_reload = asset_manager->reload(uuid);
+                if (!r_reload) {
+                  std::cerr << "Failed to reload asset " << uuid.to_string() << ": " << r_reload.error() << std::endl;
+                } else {
+                  std::cout << "Reloaded asset " << uuid.to_string() << std::endl;
+                }
+              }
             }
+          });
+          if (!r_cook_assets_process) {
+            std::cerr << "Failed to start cook_assets_process" << std::endl;
           }
-        }
-
-      });
-      if (!r_cook_assets_process) {
-        std::cerr << "Failed to start cook_assets_process" << std::endl;
-      }
-    });
+        });
     if (!r_gen_meta_files_process) {
       std::cerr << "Failed to start gen_meta_files_process" << std::endl;
     }
   }
 }
 
-} // mole
+} // namespace mole

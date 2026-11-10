@@ -43,7 +43,7 @@ Result<UUID> ProjectAssets::resolve(std::string_view path, AssetType requested_t
   auto r_is_file = file_system->is_file(asset_path);
 
   if (!r_is_file || !r_is_file.value() || asset_path.ends_with(".meta")) {
-    return mole::fail("Asset path does not represent an asset");
+    return mole::fail("Asset path '" + std::string(path) + "' does not represent an asset");
   }
 
   auto r_json = read_meta_json(asset_path);

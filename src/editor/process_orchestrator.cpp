@@ -15,8 +15,7 @@ namespace mole {
 
 ProcessOrchestrator::~ProcessOrchestrator() = default;
 
-Result<void> ProcessOrchestrator::spawn(const std::vector<std::string>& command,
-                                std::function<void()> on_finish) {
+Result<void> ProcessOrchestrator::spawn(const std::vector<std::string>& command, std::function<void()> on_finish) {
   auto r_process = Subprocess::create(command);
   if (!r_process) {
     return mole::fail("Failed to start subprocess: " + r_process.error());
@@ -24,10 +23,7 @@ Result<void> ProcessOrchestrator::spawn(const std::vector<std::string>& command,
 
   {
     std::lock_guard<std::mutex> lock(pending_mutex);
-    pending_jobs.push_back(ProcessJob{
-        std::move(r_process).value(),
-        std::move(on_finish)
-    });
+    pending_jobs.push_back(ProcessJob{std::move(r_process).value(), std::move(on_finish)});
   }
 
   return mole::ok();
@@ -38,11 +34,8 @@ void ProcessOrchestrator::update() {
   {
     std::lock_guard<std::mutex> lock(pending_mutex);
     if (!pending_jobs.empty()) {
-      active_jobs.insert(
-          active_jobs.end(),
-          std::make_move_iterator(pending_jobs.begin()),
-          std::make_move_iterator(pending_jobs.end())
-      );
+      active_jobs.insert(active_jobs.end(), std::make_move_iterator(pending_jobs.begin()),
+                         std::make_move_iterator(pending_jobs.end()));
       pending_jobs.clear();
     }
   }
@@ -51,7 +44,7 @@ void ProcessOrchestrator::update() {
   // so callbacks that call spawn() or modify jobs cannot invalidate iterators.
   std::vector<std::function<void()>> callbacks_to_run;
 
-  for (auto it = active_jobs.begin(); it != active_jobs.end(); ) {
+  for (auto it = active_jobs.begin(); it != active_jobs.end();) {
     ProcessJob& job = *it;
 
     std::vector<std::string> lines = job.process->poll_output();
@@ -86,11 +79,8 @@ void ProcessOrchestrator::update() {
   {
     std::lock_guard<std::mutex> lock(pending_mutex);
     if (!pending_jobs.empty()) {
-      active_jobs.insert(
-          active_jobs.end(),
-          std::make_move_iterator(pending_jobs.begin()),
-          std::make_move_iterator(pending_jobs.end())
-      );
+      active_jobs.insert(active_jobs.end(), std::make_move_iterator(pending_jobs.begin()),
+                         std::make_move_iterator(pending_jobs.end()));
       pending_jobs.clear();
     }
   }
@@ -100,17 +90,25 @@ void ProcessOrchestrator::flush_and_wait() {
   {
     std::lock_guard<std::mutex> lock(pending_mutex);
     if (!pending_jobs.empty()) {
-      active_jobs.insert(
-          active_jobs.end(),
-          std::make_move_iterator(pending_jobs.begin()),
-          std::make_move_iterator(pending_jobs.end())
-      );
+      active_jobs.insert(active_jobs.end(), std::make_move_iterator(pending_jobs.begin()),
+                         std::make_move_iterator(pending_jobs.end()));
       pending_jobs.clear();
     }
   }
 
   for (auto& job : active_jobs) {
-    job.process->wait();
+    while (job.process->is_running()) {
+      std::vector<std::string> lines = job.process->poll_output();
+      for (const std::string& line : lines) {
+        std::cout << line << "\n";
+      }
+      job.process->wait(); // or small sleep / wait
+    }
+    // Drain final output
+    std::vector<std::string> final_lines = job.process->poll_output();
+    for (const std::string& line : final_lines) {
+      std::cout << line << "\n";
+    }
   }
 
   for (auto& job : active_jobs) {
@@ -122,4 +120,4 @@ void ProcessOrchestrator::flush_and_wait() {
   active_jobs.clear();
 }
 
-} // mole
+} // namespace mole

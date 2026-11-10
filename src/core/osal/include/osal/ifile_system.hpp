@@ -11,9 +11,14 @@
 namespace mole {
 
 class IFileSystem {
- public:
+public:
   explicit IFileSystem() = default;
   virtual ~IFileSystem() = default;
+
+  /**
+   * @brief Gets the executable directory.
+   */
+  virtual std::filesystem::path get_executable_dir() const = 0;
 
   /**
    * @brief Mounts a prefix for usage in virtual paths. It can be then used as "prefix://"
@@ -21,6 +26,13 @@ class IFileSystem {
    * @param physical_path The physical path to the directory it should be translated to
    */
   virtual void mount(std::string_view prefix, const std::filesystem::path& physical_path) = 0;
+
+  /**
+   * @brief Mounts a prefix for usage in virtual paths pointing to another virtual path.
+   * @param prefix The prefix to mount
+   * @param virtual_path The virtual path (e.g. "exe://engine_data/editor") to translate to
+   */
+  virtual Result<void> mount_from_virtual(std::string_view prefix, std::string_view virtual_path) = 0;
 
   /**
    * @brief Resolves virtual path starting with "mounted_prefix://".
@@ -42,11 +54,11 @@ class IFileSystem {
   virtual Result<void> write_bytes(std::string_view virtual_path, const std::vector<uint8_t>& data) = 0;
 
   /**
- * @brief Reads a specific chunk of bytes from the file.
- * @param offset Byte offset from the start of the file.
- * @param size Number of bytes to read.
- * @return Result, failed if the file could not be written to.
- */
+   * @brief Reads a specific chunk of bytes from the file.
+   * @param offset Byte offset from the start of the file.
+   * @param size Number of bytes to read.
+   * @return Result, failed if the file could not be written to.
+   */
   virtual Result<std::vector<uint8_t>> read_chunk(std::string_view virtual_path, uint64_t offset, uint64_t size) = 0;
 
   virtual Result<void> remove(std::string_view virtual_path) = 0;
@@ -62,9 +74,10 @@ class IFileSystem {
   virtual Result<uint64_t> get_file_size(std::string_view virtual_path) const = 0;
 
   /**
-   * @brief Factory method to create the specific implementation.
+   * @brief Factory method to create the specific implementation. Note that this also mounts exe:// to the executable
+   * dir.
    */
   static Result<std::unique_ptr<IFileSystem>> create();
 };
 
-} // mole
+} // namespace mole
