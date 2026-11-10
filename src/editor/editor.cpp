@@ -227,21 +227,21 @@ Result<void> Editor::load_workspace() {
   auto* transform_manager = scene->get_manager<TransformManager>();
   auto* drawable_manager = scene->get_manager<DrawableManager>();
 
-  NodeID r_node = scene->create_node(NodeID::INVALID, "sprite_2d");
-  NodeID child_node1 = scene->create_node(r_node, "sprite_2d");
-  NodeID child_node2 = scene->create_node(r_node, "sprite_2d");
+  NodeID root_node = scene->create_node(NodeID::INVALID, "sprite_2d");
+  NodeID child_node1 = scene->create_node(root_node, "sprite_2d");
+  NodeID child_node2 = scene->create_node(root_node, "sprite_2d");
 
   // Cache root_node identifier so update loop can modify it
-  this->root_node = r_node;
+  this->root_node = root_node;
 
-  auto t_1 = transform_manager->set_node_position(r_node, glm::vec2(0.0f, 0.0f));
+  auto t_1 = transform_manager->set_node_position(root_node, glm::vec2(0.0f, 0.0f));
   if (!t_1) return t_1;
   auto t_2 = transform_manager->set_node_position(child_node1, glm::vec2(1.0f, 1.0f));
   if (!t_2) return t_2;
   auto t_3 = transform_manager->set_node_position(child_node2, glm::vec2(1.0f, 1.5f));
   if (!t_3) return t_3;
 
-  auto r_scale = transform_manager->set_node_scale(r_node, glm::vec2(8.0f, 8.0f));
+  auto r_scale = transform_manager->set_node_scale(root_node, glm::vec2(8.0f, 8.0f));
   if (!r_scale) return r_scale;
   auto r_scale2 = transform_manager->set_node_scale(child_node1, glm::vec2(1.0f, 1.0f));
   if (!r_scale2) return r_scale2;
@@ -250,21 +250,21 @@ Result<void> Editor::load_workspace() {
 
   glm::vec2 world_size = glm::vec2((float)scene_texture->width / PPU, (float)scene_texture->height / PPU);
 
-  auto r_s_1 = drawable_manager->set_node_size(r_node, world_size);
+  auto r_s_1 = drawable_manager->set_node_size(root_node, world_size);
   if (!r_s_1) return r_s_1;
   auto r_s_2 = drawable_manager->set_node_size(child_node1, world_size);
   if (!r_s_2) return r_s_2;
   auto r_s_3 = drawable_manager->set_node_size(child_node2, world_size);
   if (!r_s_3) return r_s_3;
 
-  auto r_mat_1 = drawable_manager->set_node_material(r_node, test_mat_id);
+  auto r_mat_1 = drawable_manager->set_node_material(root_node, test_mat_id);
   if (!r_mat_1) return r_mat_1;
   auto r_mat_2 = drawable_manager->set_node_material(child_node1, test_mat_id);
   if (!r_mat_2) return r_mat_2;
   auto r_mat_3 = drawable_manager->set_node_material(child_node2, test_mat_id2);
   if (!r_mat_3) return r_mat_3;
 
-  auto r_z_1 = drawable_manager->set_node_z_index(r_node, 0);
+  auto r_z_1 = drawable_manager->set_node_z_index(root_node, 0);
   if (!r_z_1) return r_z_1;
   auto r_z_2 = drawable_manager->set_node_z_index(child_node1, 1);
   if (!r_z_2) return r_z_2;
