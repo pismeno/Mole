@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <functional>
 
 namespace mole {
 
@@ -39,3 +40,12 @@ inline constexpr NodeID NodeID::INVALID{ std::numeric_limits<uint64_t>::max() };
 static inline constexpr uint32_t MAX_ACTIVE_NODES = 50000;
 
 } // mole
+
+namespace std {
+template <>
+struct hash<mole::NodeID> {
+  std::size_t operator()(const mole::NodeID& node) const noexcept {
+    return std::hash<uint64_t>()(node.id);
+  }
+};
+} // std
