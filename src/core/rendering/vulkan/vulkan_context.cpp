@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#ifdef BIRD_PLATFORM_WINDOWS
+#ifdef MOLE_PLATFORM_WINDOWS
 #include <windows.h>
 #endif
 #include <vulkan/vulkan.hpp>
@@ -47,10 +47,10 @@ Result<void> VulkanContext::create_instance() {
   };
 
   std::vector<const char*> extensions = { "VK_KHR_surface" };
-#ifdef BIRD_PLATFORM_WINDOWS
+#ifdef MOLE_PLATFORM_WINDOWS
   extensions.push_back("VK_KHR_win32_surface");
 #endif
-#ifdef BIRD_PLATFORM_LINUX
+#ifdef MOLE_PLATFORM_LINUX
   extensions.push_back("VK_KHR_xcb_surface");
 #endif
 

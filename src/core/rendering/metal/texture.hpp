@@ -1,7 +1,7 @@
 #pragma once
 #include <stb_image.h>
 
-#ifdef BIRD_PLATFORM_APPLE
+#ifdef MOLE_PLATFORM_APPLE
 #include <Metal/Metal.hpp>
 
 class Texture2D {

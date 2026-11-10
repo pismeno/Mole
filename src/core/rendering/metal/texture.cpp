@@ -4,7 +4,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#ifdef BIRD_PLATFORM_APPLE
+#ifdef MOLE_PLATFORM_APPLE
 Texture2D::Texture2D(const char* filepath, MTL::Device* metal_device) {
     device = metal_device;
 

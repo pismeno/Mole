@@ -1,6 +1,6 @@
-#if defined(BIRD_PLATFORM_WINDOWS)
+#if defined(MOLE_PLATFORM_WINDOWS)
 #define GLFW_EXPOSE_NATIVE_WIN32
-#elif defined(BIRD_PLATFORM_APPLE)
+#elif defined(MOLE_PLATFORM_APPLE)
 #define GLFW_EXPOSE_NATIVE_COCOA
 #endif
 
@@ -161,9 +161,9 @@ void GlfwWindow::frame_buffer_resize_callback(GLFWwindow *window, int width, int
 }
 
 void* GlfwWindow::get_native_handle() const {
-#if defined(BIRD_PLATFORM_WINDOWS)
+#if defined(MOLE_PLATFORM_WINDOWS)
   return (void*) glfwGetWin32Window(glfw_window);
-#elif defined(BIRD_PLATFORM_APPLE)
+#elif defined(MOLE_PLATFORM_APPLE)
   return (void*) glfwGetCocoaWindow(glfwWindow);
 #else
   return nullptr;

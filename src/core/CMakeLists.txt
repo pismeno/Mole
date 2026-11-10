@@ -1,9 +1,9 @@
 if (APPLE)
-    add_compile_definitions(BIRD_PLATFORM_APPLE)
+    add_compile_definitions(MOLE_PLATFORM_APPLE)
 elseif (UNIX AND NOT APPLE)
-    add_compile_definitions(BIRD_PLATFORM_LINUX)
+    add_compile_definitions(MOLE_PLATFORM_LINUX)
 elseif (WIN32)
-    add_compile_definitions(BIRD_PLATFORM_WINDOWS)
+    add_compile_definitions(MOLE_PLATFORM_WINDOWS)
 endif()
 
 add_compile_definitions(SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS=1)

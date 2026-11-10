@@ -2,7 +2,7 @@
 
 #include "rendering/irenderer.hpp"
 
-#ifdef BIRD_PLATFORM_WINDOWS
+#ifdef MOLE_PLATFORM_WINDOWS
 #include <windows.h>
 #endif
 
