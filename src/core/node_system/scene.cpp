@@ -91,10 +91,25 @@ NodeID Scene::get_node_by_uuid(const UUID uuid) const {
 }
 
 [[nodiscard]] NodeID Scene::create_node(NodeID parent_id, std::string_view node_type) {
-  NodeID new_id = generate_id();
+  return create_node(parent_id, node_type, UUID::generate_v4());
+}
 
-  nodes[new_id.index()].id = new_id;
-  nodes[new_id.index()].parent_id = NodeID::INVALID;
+[[nodiscard]] NodeID Scene::create_node(NodeID parent_id, std::string_view node_type, UUID uuid) {
+  if (uuid.is_nil() || uuid_to_node_id.contains(uuid)) {
+    return NodeID::INVALID;
+  }
+
+  NodeID new_id = generate_id();
+  if (new_id == NodeID::INVALID) {
+    return NodeID::INVALID;
+  }
+
+  const uint32_t index = new_id.index();
+  nodes[index].id = new_id;
+  nodes[index].parent_id = NodeID::INVALID;
+  node_types[index] = node_type;
+  node_uuids[index] = uuid;
+  uuid_to_node_id[uuid] = new_id;
 
   for (auto& manager : managers_flat_array) {
     manager->on_node_created(new_id);
@@ -110,12 +125,6 @@ NodeID Scene::get_node_by_uuid(const UUID uuid) const {
   if (parent_id != NodeID::INVALID && parent_id != new_id) {
     reparent_node(new_id, parent_id);
   }
-
-  node_types[new_id.index()] = node_type;
-
-  UUID new_uuid = UUID::generate_v4();
-  node_uuids[new_id.index()] = new_uuid;
-  uuid_to_node_id[new_uuid] = new_id;
 
   return new_id;
 }

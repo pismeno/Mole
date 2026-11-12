@@ -142,6 +142,12 @@ Result<void> Editor::init() {
   renderer = std::move(renderer_result).value();
   rendering_context.renderer = renderer.get();
 
+  // Instantly load the workspace during initialization
+  auto r_load = load_workspace();
+  if (!r_load) {
+    return mole::fail("Failed to load workspace: " + r_load.error());
+  }
+
   return mole::ok();
 }
 
@@ -322,20 +328,16 @@ Result<void> Editor::run() {
       }
     }
 
-    if (inputs.is_key_pressed(KeyCode::L)) {
-      if (!state) {
-        auto result = load_workspace();
-        if (!result) return result;
-      }
-    }
-
     if (inputs.is_key_pressed(KeyCode::J)) {
       if (scene) {
         nlohmann::json j;
         JsonWriteReflector writer(j);
         auto binder = ManagerReflectorBinder<JsonWriteReflector>::create(
             ManagerList<TransformManager, DrawableManager, CameraManager>{});
-        scene->reflect(writer, binder);
+        
+        // Use SceneFactory to serialize the scene
+        scene_factory->save_scene(writer, *scene, binder);
+        
         std::cout << j.dump(2) << std::endl;
       }
     }
@@ -406,7 +408,7 @@ Result<void> Editor::run() {
         view_data.viewProjection = view_data.projection * view_data.view;
       }
     } else {
-      // Fallback before the workspace is loaded via 'L'
+      // Fallback before the workspace is loaded via 'L' (removed, but kept for safety)
       view_data.projection = glm::mat4(1.0f);
       view_data.view = glm::mat4(1.0f);
       view_data.viewProjection = glm::mat4(1.0f);

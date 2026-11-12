@@ -63,6 +63,24 @@ class [[nodiscard]] Result {
     return std::get<1>(data); // Retrieve by index
   }
 
+  /**
+    * @brief Returns the contained value if successful, otherwise returns default_value.
+    */
+  template <typename U>
+  requires std::copy_constructible<T> && std::convertible_to<U&&, T>
+  [[nodiscard]] constexpr T value_or(U&& default_value) const & {
+    return is_ok() ? std::get<0>(data) : static_cast<T>(std::forward<U>(default_value));
+  }
+
+  /**
+    * @brief Moves the contained value if successful, otherwise returns default_value.
+    */
+  template <typename U>
+  requires std::move_constructible<T> && std::convertible_to<U&&, T>
+  [[nodiscard]] constexpr T value_or(U&& default_value) && {
+    return is_ok() ? std::get<0>(std::move(data)) : static_cast<T>(std::forward<U>(default_value));
+  }
+
  private:
   std::variant<T, std::string> data;
 };

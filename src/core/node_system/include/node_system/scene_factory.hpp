@@ -1,6 +1,5 @@
 #pragma once
 
-#include <concepts>
 #include <functional>
 #include <memory>
 #include <string>
@@ -9,14 +8,15 @@
 #include <vector>
 
 #include "node_system/inode_manager.hpp"
+#include "node_system/manager_reflector_binder.hpp"
+#include "node_system/scene.hpp"
 #include "utils/result.hpp"
-#include "utils/uuid.hpp"
+#include "utils/creflector.hpp"
 
 namespace mole {
 
 class AssetManager;
 class IFileSystem;
-class Scene;
 struct NodeSystemContext;
 
 using ManagerFactory = std::function<std::unique_ptr<INodeManager>()>;
@@ -45,6 +45,145 @@ class SceneFactory {
   Result<std::unique_ptr<Scene>> create_scene(const std::string& scene_type) const;
 
   /**
+    * @brief Serializes a scene (including its scene_type header) into a writing reflector.
+    */
+  template <CReflector TReflector>
+  requires (TReflector::is_writing())
+  void save_scene(
+      TReflector& re, 
+      const Scene& scene, 
+      const ManagerReflectorBinder<TReflector>& binder) const {
+    
+    // Write scene_type header
+    std::string scene_type = scene.scene_type_name;
+    serialize(re, "scene_type", scene_type);
+
+    // Gather active nodes
+    std::vector<NodeID> active_nodes;
+    for (uint32_t i = 0; i < scene.get_highest_allocated_node_index(); ++i) {
+      NodeID id = NodeID::from(i, scene.generations[i]);
+      if (scene.is_node_valid(id)) {
+        active_nodes.push_back(id);
+      }
+    }
+
+    uint32_t node_count = static_cast<uint32_t>(active_nodes.size());
+    re.begin_array("nodes", node_count);
+
+    for (NodeID current : active_nodes) {
+      re.begin_object(nullptr);
+
+      UUID saved_uuid = scene.get_uuid(current).value_or(UUID{});
+      UUID saved_parent_uuid{};
+      
+      NodeID parent = scene.get_nodes_parent(current);
+      if (scene.is_node_valid(parent)) {
+        saved_parent_uuid = scene.get_uuid(parent).value_or(UUID{});
+      }
+
+      std::string node_type_str = scene.node_types[current.index()];
+
+      serialize(re, "id", saved_uuid);
+      serialize(re, "parent_id", saved_parent_uuid);
+      serialize(re, "node_type", node_type_str);
+
+      re.begin_object("managers");
+      auto def_it = scene.node_type_definitions.find(node_type_str);
+      if (def_it != scene.node_type_definitions.end()) {
+        for (INodeManager* mgr : def_it->second.managers) {
+          if (const auto* entry = binder.get_entry(mgr->get_name())) {
+            re.begin_object(entry->type_id);
+            // Note: binder's reflect takes non-const Scene& as INodeResolver, 
+            // const_cast is safe here since TReflector::is_writing() is true.
+            entry->reflect(mgr, current, re, const_cast<Scene&>(scene));
+            re.end_object();
+          }
+        }
+      }
+      re.end_object(); // managers
+      re.end_object(); // node
+    }
+
+    re.end_array(); // nodes
+  }
+
+  /**
+    * @brief Deserializes a scene from a reading reflector, automatically instantiating
+    *        the correct scene type and managers.
+    */
+  template <CReflector TReflector>
+  requires (!TReflector::is_writing())
+  Result<std::unique_ptr<Scene>> load_scene(
+      TReflector& re, 
+      const ManagerReflectorBinder<TReflector>& binder) const {
+    
+    // Read scene_type first and construct the properly configured Scene
+    std::string scene_type;
+    serialize(re, "scene_type", scene_type);
+
+    auto scene_res = create_scene(scene_type);
+    if (!scene_res) {
+      return scene_res;
+    }
+    std::unique_ptr<Scene> scene = std::move(scene_res).value();
+
+    // Read nodes array
+    uint32_t node_count = 0;
+    re.begin_array("nodes", node_count);
+
+    struct PendingParent { NodeID child; UUID saved_parent_uuid; };
+    std::vector<PendingParent> pending_parents;
+    std::unordered_map<UUID, NodeID> uuid_remapping_table;
+
+    for (uint32_t i = 0; i < node_count; ++i) {
+      re.begin_object(nullptr);
+
+      UUID saved_uuid{};
+      UUID saved_parent_uuid{};
+      std::string node_type_str;
+
+      serialize(re, "id", saved_uuid);
+      serialize(re, "parent_id", saved_parent_uuid);
+      serialize(re, "node_type", node_type_str);
+
+      // Preserve the serialized UUID on the newly created node
+      NodeID runtime_node = scene->create_node(NodeID::INVALID, node_type_str, saved_uuid);
+      uuid_remapping_table[saved_uuid] = runtime_node;
+
+      if (!saved_parent_uuid.is_nil()) {
+        pending_parents.push_back({runtime_node, saved_parent_uuid});
+      }
+
+      re.begin_object("managers");
+      auto def_it = scene->node_type_definitions.find(node_type_str);
+      if (def_it != scene->node_type_definitions.end()) {
+        for (INodeManager* mgr : def_it->second.managers) {
+          if (const auto* entry = binder.get_entry(mgr->get_name())) {
+            re.begin_object(entry->type_id);
+            entry->reflect(mgr, runtime_node, re, *scene);
+            re.end_object();
+          }
+        }
+      }
+      re.end_object(); // managers
+      re.end_object(); // node
+    }
+
+    re.end_array(); // nodes
+
+    // Reconstruct hierarchy
+    for (const auto& pending : pending_parents) {
+      auto it = uuid_remapping_table.find(pending.saved_parent_uuid);
+      if (it != uuid_remapping_table.end()) {
+        scene->reparent_node(pending.child, it->second);
+      }
+    }
+
+    return scene;
+  }
+
+
+  /**
    * @brief Registers a manager for this SceneFactory instance.
    * @note Asserts that the manager name must be unique.
    */
@@ -63,7 +202,7 @@ class SceneFactory {
    */
   static Result<std::unique_ptr<SceneFactory>> create(const NodeSystemContext& context);
 
- private:
+private:
   explicit SceneFactory() = default;
 
   Result<void> init(const NodeSystemContext& context);
