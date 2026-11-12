@@ -11,10 +11,15 @@ add_compile_definitions(SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS=1)
 add_library(MoleUtils INTERFACE)
 
 target_sources(MoleUtils INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/json_read_archive.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/json_write_archive.hpp
+
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/result.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/string_hash.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/counter.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/uuid.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/archive.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/json_archive.hpp
 )
 
 target_include_directories(MoleUtils INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/utils/include)
