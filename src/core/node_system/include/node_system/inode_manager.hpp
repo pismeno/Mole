@@ -1,11 +1,11 @@
 #pragma once
 
+#include <concepts>
 #include <string>
 
 #include <nlohmann/json.hpp>
 
 #include "node_system/node_types.hpp"
-#include "utils/result.hpp"
 
 namespace mole {
 
@@ -58,8 +58,19 @@ class INodeManager {
   virtual void on_scene_clear() noexcept {};
 };
 
+template<typename T>
+concept SerializableManager = std::derived_from<T, INodeManager> && requires(T mgr, NodeID id) {
+  { T::TYPE_ID } -> std::convertible_to<const char*>;
+  { mgr.has_node(id) } -> std::same_as<bool>;
+};
+
 template <typename Derived>
 class NodeManagerBase : public INodeManager {
+  NodeManagerBase() {
+      static_assert(mole::SerializableManager<Derived>, 
+          "Derived manager must implement TYPE_ID and has_node() to be serializable!");
+    }
+    
  public:
   std::string get_name() const noexcept override {
     return std::string(Derived::TYPE_ID);
