@@ -103,6 +103,7 @@ target_sources(MoleNodeSystem
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/managers/transform_manager.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/managers/camera_manager.cpp
 
+        ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/inode_resolver.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/inode_manager.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/cmanager_serializable.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/node.hpp

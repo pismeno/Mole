@@ -11,6 +11,8 @@
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
+#include "utils/uuid.hpp"
+
 namespace mole {
 
 template<typename T>
@@ -54,6 +56,18 @@ inline void serialize_field(CReflector auto& re, const char* name, glm::vec4& v)
   re.field("z", v.z);
   re.field("w", v.w);
   re.end_object();
+}
+
+template <CReflector TReflector>
+inline void serialize_field(TReflector& re, const char* name, UUID uuid) {
+  if constexpr (TReflector::is_writing()) {
+      std::string str = uuid.to_string();
+      re.field(name, str);
+    } else {
+      std::string str;
+      re.field(name, str);
+      uuid = UUID::from_string(str);
+    }
 }
 
 template<typename T>

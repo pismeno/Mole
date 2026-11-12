@@ -19,6 +19,7 @@ Scene::Scene(std::string scene_type_name) : scene_type_name(std::move(scene_type
   nodes.resize(MAX_ACTIVE_NODES);
   generations.resize(MAX_ACTIVE_NODES);
   node_types.resize(MAX_ACTIVE_NODES);
+  node_uuids.resize(MAX_ACTIVE_NODES);
 }
 
 Scene::~Scene() = default;
@@ -69,6 +70,26 @@ INodeManager* Scene::get_manager_by_name(std::string_view type_id) const {
   return nodes[node_id.index()].children_ids;
 }
 
+Result<UUID> Scene::get_uuid(NodeID node_id) const {
+  if (!is_node_valid(node_id)) {
+    return mole::fail("Node ID is not valid");
+  }
+
+  return node_uuids[node_id.index()];
+}
+
+NodeID Scene::get_node_by_uuid(const UUID uuid) const {
+  auto it = uuid_to_node_id.find(uuid);
+  if (it != uuid_to_node_id.end()) {
+    
+    if (is_node_valid(it->second)) {
+      return it->second;
+    }
+  }
+
+  return NodeID::INVALID; 
+}
+
 [[nodiscard]] NodeID Scene::create_node(NodeID parent_id, std::string_view node_type) {
   NodeID new_id = generate_id();
 
@@ -91,6 +112,10 @@ INodeManager* Scene::get_manager_by_name(std::string_view type_id) const {
   }
 
   node_types[new_id.index()] = node_type;
+
+  UUID new_uuid = UUID::generate_v4();
+  node_uuids[new_id.index()] = new_uuid;
+  uuid_to_node_id[new_uuid] = new_id;
 
   return new_id;
 }
@@ -130,6 +155,9 @@ void Scene::destroy_node(NodeID node_id) {
   node->id = NodeID::INVALID;
   node->parent_id = NodeID::INVALID;
   node->children_ids.clear();
+
+  UUID dead_uuid = node_uuids[node_id.index()];
+  uuid_to_node_id.erase(dead_uuid);
 }
 
 void Scene::clear_nodes() {

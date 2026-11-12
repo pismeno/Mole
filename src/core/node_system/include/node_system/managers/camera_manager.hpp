@@ -6,6 +6,7 @@
 
 #include <glm/vec4.hpp>
 
+#include "node_system/inode_resolver.hpp"
 #include "node_system/node_types.hpp"
 #include "utils/result.hpp"
 #include "utils/creflector.hpp"
@@ -49,7 +50,7 @@ public:
   void on_scene_clear() noexcept override;
 
   template<CReflector TReflector>
-  void reflect(NodeID node_id, TReflector& re) {
+  void reflect(NodeID node_id, TReflector& re, INodeResolver& node_resolver) {
     auto it = cameras.find(node_id);
     if (it == cameras.end()) {
       if constexpr (TReflector::is_writing()) {

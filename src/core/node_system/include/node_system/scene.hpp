@@ -12,16 +12,19 @@
 
 #include <nlohmann/json.hpp>
 
+#include "node_system/inode_resolver.hpp"
 #include "node_system/inode_manager.hpp"
 #include "node_system/node.hpp"
 #include "node_system/node_types.hpp"
 #include "node_system/manager_reflector_binder.hpp"
 #include "utils/creflector.hpp"
 #include "utils/string_hash.hpp"
+#include "utils/uuid.hpp"
+#include "utils/result.hpp"
 
 namespace mole {
 
-class Scene {
+class Scene : public INodeResolver {
 
   friend class NodeHandle;
 
@@ -34,6 +37,9 @@ class Scene {
   [[nodiscard]] bool is_node_valid(const NodeID node_id) const noexcept;
   const NodeID get_nodes_parent(const NodeID node_id) const noexcept;
   std::vector<NodeID> get_nodes_children(const NodeID node_id) const noexcept;
+
+  Result<UUID> get_uuid(NodeID node_id) const override;    
+  NodeID get_node_by_uuid(const UUID uuid) const override;
 
   [[nodiscard]] NodeID create_node(NodeID parent_id, std::string_view node_type);
   void destroy_node(NodeID node_id);
@@ -61,6 +67,8 @@ class Scene {
 
   template <CReflector TReflector>
   void reflect(TReflector& re, const ManagerReflectorBinder<TReflector>& binder) {
+    re.field("scene_type", scene_type_name);
+    
     if constexpr (!TReflector::is_writing()) {
       clear_nodes();
     }
@@ -78,38 +86,47 @@ class Scene {
     uint32_t node_count = TReflector::is_writing() ? static_cast<uint32_t>(active_nodes.size()) : 0;
     re.begin_array("nodes", node_count);
 
-    struct PendingParent { NodeID child; uint64_t saved_parent_id; };
+    struct PendingParent { NodeID child; UUID saved_parent_uuid; };
     std::vector<PendingParent> pending_parents;
-    std::unordered_map<uint64_t, NodeID> id_remapping_table;
+    std::unordered_map<UUID, NodeID> uuid_remapping_table; // Replaces id_remapping_table
 
     for (uint32_t i = 0; i < node_count; ++i) {
       re.begin_object(nullptr);
 
-      uint64_t saved_id = 0;
-      uint64_t saved_parent_id = 0;
+      UUID saved_uuid{};
+      UUID saved_parent_uuid{};
       std::string node_type_name_str;
 
       if constexpr (TReflector::is_writing()) {
         NodeID current = active_nodes[i];
-        saved_id = current.id; 
+        
+        // Unwrap Result<UUID>
+        if (auto res = get_uuid(current)) {
+            saved_uuid = res.value();
+        }
         
         NodeID parent = get_nodes_parent(current);
-        saved_parent_id = is_node_valid(parent) ? parent.id : 0; 
+        if (is_node_valid(parent)) {
+            if (auto parent_res = get_uuid(parent)) {
+                saved_parent_uuid = parent_res.value();
+            }
+        }
+        
         node_type_name_str = node_types[current.index()];
       }
 
-      re.field("id", saved_id);
-      re.field("parent_id", saved_parent_id);
+      serialize_field(re, "id", saved_uuid);
+      serialize_field(re, "parent_id", saved_parent_uuid);
       re.field("node_type", node_type_name_str);
 
       NodeID runtime_node;
       if constexpr (!TReflector::is_writing()) {
         runtime_node = create_node(NodeID::INVALID, node_type_name_str); 
         
-        id_remapping_table[saved_id] = runtime_node;
+        uuid_remapping_table[saved_uuid] = runtime_node;
 
-        if (saved_parent_id != 0) {
-          pending_parents.push_back({runtime_node, saved_parent_id});
+        if (!saved_parent_uuid.is_nil()) {
+          pending_parents.push_back({runtime_node, saved_parent_uuid});
         }
       } else {
         runtime_node = active_nodes[i];
@@ -124,14 +141,14 @@ class Scene {
           if (const auto* entry = binder.get_entry(mgr->get_name())) {
             
             re.begin_object(entry->type_id);
-            entry->reflect(mgr, runtime_node, re);
+            entry->reflect(mgr, runtime_node, re, *this); 
             re.end_object();
             
           }
         }
       }
       
-      re.end_object(); // components
+      re.end_object(); // managers
       re.end_object(); // node
     }
     
@@ -139,8 +156,8 @@ class Scene {
 
     if constexpr (!TReflector::is_writing()) {
       for (const auto& pending : pending_parents) {
-        auto it = id_remapping_table.find(pending.saved_parent_id);
-        if (it != id_remapping_table.end()) {
+        auto it = uuid_remapping_table.find(pending.saved_parent_uuid);
+        if (it != uuid_remapping_table.end()) {
           reparent_node(pending.child, it->second);
         }
       }
@@ -157,6 +174,9 @@ class Scene {
   std::vector<uint32_t> generations; // Index = the raw array slot, Value = the current active generation
   std::vector<Node> nodes;
   std::vector<std::string> node_types;
+
+  std::vector<UUID> node_uuids;
+  std::unordered_map<UUID, NodeID> uuid_to_node_id;
 
   std::unordered_map<std::string, std::unique_ptr<INodeManager>, StringHash, std::equal_to<>> managers_map;
   std::vector<INodeManager*> managers_flat_array;

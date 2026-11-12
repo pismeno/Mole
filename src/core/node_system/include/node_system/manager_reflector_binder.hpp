@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "node_system/inode_manager.hpp"
+#include "node_system/inode_resolver.hpp"
 #include "node_system/manager_list.hpp"
 #include "node_system/node_types.hpp"
 #include "node_system/cmanager_serializable.hpp"
@@ -15,7 +16,7 @@ namespace mole {
 template<CReflector TReflector>
 class ManagerReflectorBinder {
  public:
-  using ReflectFn = void (*)(INodeManager* mgr, NodeID node_id, TReflector& re);
+  using ReflectFn = void (*)(INodeManager* mgr, NodeID node_id, TReflector& re, INodeResolver& resolver);
 
   struct Entry {
     const char* type_id = nullptr;
@@ -45,8 +46,8 @@ class ManagerReflectorBinder {
   void bind() {
     map_entries[T::TYPE_ID] = Entry{
       T::TYPE_ID,
-      [](INodeManager* base, NodeID node_id, TReflector& re) {
-        static_cast<T*>(base)->reflect(node_id, re);
+      [](INodeManager* base, NodeID node_id, TReflector& re, INodeResolver& resolver) {
+        static_cast<T*>(base)->reflect(node_id, re, resolver);
       }
     };
   }

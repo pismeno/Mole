@@ -9,6 +9,7 @@
 #include <glm/vec2.hpp>
 #include <nlohmann/json.hpp>
 
+#include "node_system/inode_resolver.hpp"
 #include "node_system/node_types.hpp"
 #include "resources/material_types.hpp"
 #include "utils/creflector.hpp"
@@ -55,7 +56,7 @@ class DrawableManager : public NodeManager<DrawableManager> {
   void on_scene_clear() noexcept override;
 
   template<CReflector TReflector>
-  void reflect(NodeID node_id, TReflector& re) {
+  void reflect(NodeID node_id, TReflector& re, INodeResolver& node_resolver) {
     if (node_id.index() >= drawables.size()) return;
     Drawable& drawable = drawables[node_id.index()];
   

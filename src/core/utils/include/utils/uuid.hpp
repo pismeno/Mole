@@ -52,6 +52,13 @@ struct UUID { // Implemented using Gemini AI
     return std::string(buf);
   }
 
+  [[nodiscard]] bool is_nil() const noexcept {
+    for (uint8_t b : data) {
+      if (b != 0) return false;
+    }
+    return true;
+  }
+
   static UUID from_string(const std::string& str) {
     UUID id;
 
