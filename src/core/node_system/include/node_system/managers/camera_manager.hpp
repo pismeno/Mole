@@ -60,9 +60,20 @@ public:
         return;
       }
     }
-  
+
+    bool is_active = (node_id == active_node);
+    
     Camera& camera = it->second;
-  
+
+    re.field("is_active", is_active);
+    
+    // If deserializing pdate the active_node if this camera was marked active
+    if constexpr (!TReflector::is_writing()) {
+        if (is_active) {
+            active_node = node_id;
+        }
+    }
+
     re.field("size", camera.size);
     re.field("aspect_ratio", camera.aspect_ratio);
     re.field("near_plane", camera.near_plane);
