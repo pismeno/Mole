@@ -29,48 +29,6 @@ void DrawableManager::on_scene_clear() noexcept {
   }
 }
 
-Result<void> DrawableManager::on_serialize_scene(nlohmann::json &json) const {
-  json["nodes"] = nlohmann::json::array();
-
-  uint32_t node_idx = 0;
-
-  for (node_idx = 0; node_idx < drawables.size(); ++node_idx) {
-    if (!drawables[node_idx].is_visible) {
-      continue;
-    }
-
-    nlohmann::json drawable_json;
-
-    drawable_json["id"] = node_idx;
-    drawable_json["z_index"] = drawables[node_idx].z_index;
-
-    json["nodes"].push_back(drawable_json);
-  }
-
-  return mole::ok();
-}
-
-Result<void> DrawableManager::on_deserialize_scene(const nlohmann::json &json) {
-  if (!json.contains("nodes") || !json["nodes"].is_array()) {
-    return mole::ok();
-  }
-
-  for (const auto& node_json : json["nodes"]) {
-    if (!node_json.contains("id") || !node_json["id"].is_number_integer()) {
-      continue;
-    }
-
-    uint32_t node_idx = node_json["id"].get<uint32_t>();
-    drawables[node_idx].is_visible = true;
-
-    if (node_json.contains("z_index") && node_json["z_index"].is_number_integer()) {
-      drawables[node_idx].z_index = node_json["z_index"].get<uint32_t>();
-    }
-  }
-
-  return mole::ok();
-}
-
 Result<void> DrawableManager::set_node_visible(NodeID node_id, bool visible) {
   if (node_id.index() >= MAX_ACTIVE_NODES) {
     return mole::fail("Node ID is out of bounds!");

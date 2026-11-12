@@ -48,9 +48,6 @@ class Scene {
 
   void clear_nodes();
 
-  Result<void> serialize(nlohmann::json& json) const;
-  Result<void> deserialize(const nlohmann::json& json);
-
   void add_manager(std::unique_ptr<INodeManager> manager);
   void add_node_type(std::string_view node_type, std::span<const std::string> node_managers);
 

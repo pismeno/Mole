@@ -52,9 +52,6 @@ class DrawableManager : public NodeManagerBase<DrawableManager> {
   void on_node_destroyed(NodeID node_id) noexcept override;
   void on_node_require_manager(NodeID node_id) noexcept override;
   void on_scene_clear() noexcept override;
-  Result<void> on_serialize_scene(nlohmann::json& json) const override;
-  Result<void> on_deserialize_scene(const nlohmann::json& json) override;
-
  private:
   std::vector<Drawable> drawables;
 };

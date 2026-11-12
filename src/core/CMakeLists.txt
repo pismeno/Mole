@@ -94,7 +94,6 @@ target_sources(MoleNodeSystem
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/render_gatherer.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/scene.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/scene_factory.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/node_system/scene_serde.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/managers/drawable_manager.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/managers/transform_manager.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/managers/camera_manager.cpp

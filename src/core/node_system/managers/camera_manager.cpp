@@ -47,14 +47,4 @@ Result<Camera> CameraManager::get_camera(NodeID node_id) const {
   return cameras.find(node_id)->second;
 }
 
-// TODO
-// 
-Result<void> CameraManager::on_serialize_scene(nlohmann::json &json) const {
-  return mole::ok();
-}
-
-Result<void> CameraManager::on_deserialize_scene(const nlohmann::json &json) {
-  return mole::ok();
-}
-//
 } // mole

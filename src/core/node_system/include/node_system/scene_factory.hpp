@@ -43,9 +43,6 @@ class SceneFactory {
    * @param scene_type the string id of the scene type to create.
    */
   Result<std::unique_ptr<Scene>> create_scene(const std::string& scene_type) const;
-  Result<std::unique_ptr<Scene>> load_scene_from(const std::string_view scene_source) const;
-  Result<std::unique_ptr<Scene>> load_scene_from_asset(UUID uuid) const;
-  Result<void> save_scene_to(const Scene& scene, std::string_view path) const;
 
   /**
    * @brief Registers a manager for this SceneFactory instance.

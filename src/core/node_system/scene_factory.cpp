@@ -12,14 +12,10 @@
 
 #include "node_system/node_system_context.hpp"
 #include "node_system/scene.hpp"
-#include "osal/ifile_system.hpp"
 #include "osal/os_context.hpp"
-#include "resources/asset_handle.hpp"
 #include "resources/asset_manager.hpp"
-#include "resources/asset_types.hpp"
 #include "resources/resources_context.hpp"
 #include "utils/result.hpp"
-#include "utils/uuid.hpp"
 
 namespace mole {
 
@@ -168,65 +164,6 @@ Result<void> SceneFactory::load_node_definitions_from(const std::string_view def
   }
 
   return mole::ok();
-}
-
-Result<void> SceneFactory::save_scene_to(const Scene &scene, std::string_view path) const {
-  nlohmann::json data;
-
-  data["scene"] = nlohmann::json::object();
-  data["scene"]["type"] = scene.get_scene_type();
-  auto scene_ser_result = scene.serialize(data["scene"]);
-
-  if (!scene_ser_result) {
-    return scene_ser_result;
-  }
-
-  std::string json_string = data.dump(2);
-  std::vector<uint8_t> byte_data(json_string.begin(), json_string.end());
-  auto r_write_bytes = file_system->write_bytes(path, byte_data);
-  if (!r_write_bytes) return r_write_bytes;
-
-  return mole::ok();
-}
-
-Result<std::unique_ptr<Scene>> SceneFactory::load_scene_from(const std::string_view scene_source) const {
-  nlohmann::json data = nlohmann::json::parse(scene_source, nullptr, false);
-
-  if (data.is_discarded()) {
-    return mole::fail("failed to parse JSON from source.");
-  }
-
-  if (!data.contains("scene") || !data["scene"].is_object()) {
-    return mole::fail("invalid scene JSON: missing 'scene' object in source.");
-  }
-
-  const auto& scene_json = data["scene"];
-
-  if (!scene_json.contains("type") || !scene_json["type"].is_string()) {
-    return mole::fail("invalid scene JSON: missing 'type' string in source.");
-  }
-
-  auto scene_result = create_scene(scene_json["type"].get<std::string>());
-  if (!scene_result) {
-    return scene_result;
-  }
-
-  std::unique_ptr<Scene> scene = std::move(scene_result).value();
-
-  auto deserialization_result = scene->deserialize(scene_json);
-
-  if (!deserialization_result) {
-    return mole::fail(deserialization_result.error());
-  }
-
-  return std::move(scene);
-}
-
-Result<std::unique_ptr<Scene>> SceneFactory::load_scene_from_asset(UUID uuid) const {
-   auto r_get_json = asset_manager->acquire<TextAsset>(uuid);
-   if (!r_get_json) return mole::fail(r_get_json.error());
-
-   return load_scene_from(r_get_json.value()->as_string_view());
 }
 
 } // mole
