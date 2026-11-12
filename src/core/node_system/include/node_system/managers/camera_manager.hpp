@@ -65,7 +65,7 @@ public:
     
     Camera& camera = it->second;
 
-    re.field("is_active", is_active);
+    serialize(re, "is_active", is_active);
     
     // If deserializing pdate the active_node if this camera was marked active
     if constexpr (!TReflector::is_writing()) {
@@ -74,12 +74,12 @@ public:
         }
     }
 
-    re.field("size", camera.size);
-    re.field("aspect_ratio", camera.aspect_ratio);
-    re.field("near_plane", camera.near_plane);
-    re.field("far_plane", camera.far_plane);
-    re.field("zoom", camera.zoom);
-    serialize_field(re, "viewport", camera.viewport);
+    serialize(re, "size", camera.size);
+    serialize(re, "aspect_ratio", camera.aspect_ratio);
+    serialize(re, "near_plane", camera.near_plane);
+    serialize(re, "far_plane", camera.far_plane);
+    serialize(re, "zoom", camera.zoom);
+    serialize(re, "viewport", camera.viewport);
   }
 private:
   NodeID active_node = NodeID::INVALID;

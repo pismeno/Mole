@@ -60,10 +60,10 @@ class DrawableManager : public NodeManager<DrawableManager> {
     if (node_id.index() >= drawables.size()) return;
     Drawable& drawable = drawables[node_id.index()];
   
-    re.field("visible", drawable.is_visible);
-    serialize_field(re, "size", drawable.size);
-    //serialize_field(re, "material_id", drawable.material_id); // TODO use uuids for materials
-    re.field("z_index", drawable.z_index);
+    serialize(re, "visible", drawable.is_visible);
+    serialize(re, "size", drawable.size);
+    //serialize(re, "material_id", drawable.material_id); // TODO use uuids for materials
+    serialize(re, "z_index", drawable.z_index);
   }
  private:
   std::vector<Drawable> drawables;

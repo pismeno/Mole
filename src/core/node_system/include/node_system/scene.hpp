@@ -67,8 +67,6 @@ class Scene : public INodeResolver {
 
   template <CReflector TReflector>
   void reflect(TReflector& re, const ManagerReflectorBinder<TReflector>& binder) {
-    re.field("scene_type", scene_type_name);
-    
     if constexpr (!TReflector::is_writing()) {
       clear_nodes();
     }
@@ -115,9 +113,9 @@ class Scene : public INodeResolver {
         node_type_name_str = node_types[current.index()];
       }
 
-      serialize_field(re, "id", saved_uuid);
-      serialize_field(re, "parent_id", saved_parent_uuid);
-      re.field("node_type", node_type_name_str);
+      serialize(re, "id", saved_uuid);
+      serialize(re, "parent_id", saved_parent_uuid);
+      serialize(re, "node_type", node_type_name_str);
 
       NodeID runtime_node;
       if constexpr (!TReflector::is_writing()) {

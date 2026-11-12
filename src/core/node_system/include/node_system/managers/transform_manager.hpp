@@ -63,10 +63,10 @@ class TransformManager : public NodeManager<TransformManager> {
     TransformInfo* transform = get_transform(node_id.index());
     if (!transform) return;
   
-    serialize_field(re, "position", transform->local_position);
-    serialize_field(re, "scale", transform->local_scale);
-    serialize_field(re, "shear", transform->local_shear);
-    re.field("rotation", transform->local_rotation);
+    serialize(re, "position", transform->local_position);
+    serialize(re, "scale", transform->local_scale);
+    serialize(re, "shear", transform->local_shear);
+    serialize(re, "rotation", transform->local_rotation);
   
     if constexpr (TReflector::is_writing()) {
       transform->is_dirty = true;
