@@ -6,13 +6,13 @@
 
 #include <nlohmann/json.hpp>
 
-#include "utils/archive.hpp"
+#include "utils/reflector.hpp"
 
 namespace mole {
 
-class JsonWriteArchive {
+class JsonWriteReflector {
  public:
-  explicit JsonWriteArchive(nlohmann::json& root) noexcept;
+  explicit JsonWriteReflector(nlohmann::json& root) noexcept;
 
   static constexpr bool is_writing() noexcept { return true; }
   
@@ -37,9 +37,9 @@ class JsonWriteArchive {
   std::vector<nlohmann::json*> node_stack;
 };
 
-class JsonReadArchive {
+class JsonReadReflector {
  public:
-  explicit JsonReadArchive(const nlohmann::json& root) noexcept;
+  explicit JsonReadReflector(const nlohmann::json& root) noexcept;
 
   static constexpr bool is_writing() noexcept { return false; }
   
@@ -70,7 +70,7 @@ class JsonReadArchive {
   std::vector<Scope> scope_stack;
 };
 
-static_assert(Archive<JsonWriteArchive>);
-static_assert(Archive<JsonReadArchive>);
+static_assert(Reflector<JsonWriteReflector>);
+static_assert(Reflector<JsonReadReflector>);
 
 } // mole

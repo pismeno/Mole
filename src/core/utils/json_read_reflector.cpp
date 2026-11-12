@@ -1,4 +1,4 @@
-#include "utils/json_archive.hpp"
+#include "utils/json_reflector.hpp"
 
 #include <cstdint>
 #include <string>
@@ -7,12 +7,12 @@
 
 namespace mole {
 
-JsonReadArchive::JsonReadArchive(const nlohmann::json& root) noexcept {
+JsonReadReflector::JsonReadReflector(const nlohmann::json& root) noexcept {
   scope_stack.push_back({&root, 0});
 }
 
 template<typename T>
-void JsonReadArchive::read_primitive(const char* name, T& value) {
+void JsonReadReflector::read_primitive(const char* name, T& value) {
   Scope& curr = current();
   if (!curr.node) return;
 
@@ -31,14 +31,14 @@ void JsonReadArchive::read_primitive(const char* name, T& value) {
   }
 }
 
-void JsonReadArchive::field(const char* name, int32_t& value) { read_primitive(name, value); }
-void JsonReadArchive::field(const char* name, uint32_t& value) { read_primitive(name, value); }
-void JsonReadArchive::field(const char* name, uint64_t& value) { read_primitive(name, value); }
-void JsonReadArchive::field(const char* name, float& value) { read_primitive(name, value); }
-void JsonReadArchive::field(const char* name, bool& value) { read_primitive(name, value); }
-void JsonReadArchive::field(const char* name, std::string& value) { read_primitive(name, value); }
+void JsonReadReflector::field(const char* name, int32_t& value) { read_primitive(name, value); }
+void JsonReadReflector::field(const char* name, uint32_t& value) { read_primitive(name, value); }
+void JsonReadReflector::field(const char* name, uint64_t& value) { read_primitive(name, value); }
+void JsonReadReflector::field(const char* name, float& value) { read_primitive(name, value); }
+void JsonReadReflector::field(const char* name, bool& value) { read_primitive(name, value); }
+void JsonReadReflector::field(const char* name, std::string& value) { read_primitive(name, value); }
 
-void JsonReadArchive::begin_object(const char* name) {
+void JsonReadReflector::begin_object(const char* name) {
   static const nlohmann::json empty_object = nlohmann::json::object();
   Scope& curr = current();
 
@@ -59,13 +59,13 @@ void JsonReadArchive::begin_object(const char* name) {
   scope_stack.push_back({&empty_object, 0});
 }
 
-void JsonReadArchive::end_object() {
+void JsonReadReflector::end_object() {
   if (scope_stack.size() > 1) {
     scope_stack.pop_back();
   }
 }
 
-void JsonReadArchive::begin_array(const char* name, uint32_t& count) {
+void JsonReadReflector::begin_array(const char* name, uint32_t& count) {
   static const nlohmann::json empty_array = nlohmann::json::array();
   Scope& curr = current();
 
@@ -90,7 +90,7 @@ void JsonReadArchive::begin_array(const char* name, uint32_t& count) {
   scope_stack.push_back({&empty_array, 0});
 }
 
-void JsonReadArchive::end_array() {
+void JsonReadReflector::end_array() {
   if (scope_stack.size() > 1) {
     scope_stack.pop_back();
   }
