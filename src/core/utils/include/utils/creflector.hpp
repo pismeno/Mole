@@ -14,7 +14,7 @@
 namespace mole {
 
 template<typename T>
-concept Reflector = requires(T re, const char* name, int32_t& i32, uint32_t& u32, uint64_t& u64, float& f, bool& b, std::string& s) {
+concept CReflector = requires(T re, const char* name, int32_t& i32, uint32_t& u32, uint64_t& u64, float& f, bool& b, std::string& s) {
   { T::is_writing() } -> std::same_as<bool>;
 
   // Core Primitives
@@ -32,14 +32,14 @@ concept Reflector = requires(T re, const char* name, int32_t& i32, uint32_t& u32
   { re.end_array() } -> std::same_as<void>;
 };
 
-inline void serialize_field(Reflector auto& re, const char* name, glm::vec2& v) {
+inline void serialize_field(CReflector auto& re, const char* name, glm::vec2& v) {
   re.begin_object(name);
   re.field("x", v.x);
   re.field("y", v.y);
   re.end_object();
 }
 
-inline void serialize_field(Reflector auto& re, const char* name, glm::vec3& v) {
+inline void serialize_field(CReflector auto& re, const char* name, glm::vec3& v) {
   re.begin_object(name);
   re.field("x", v.x);
   re.field("y", v.y);
@@ -49,7 +49,7 @@ inline void serialize_field(Reflector auto& re, const char* name, glm::vec3& v) 
 
 template<typename T>
 requires std::is_enum_v<T>
-inline void serialize_field(Reflector auto& re, const char* name, T& value) {
+inline void serialize_field(CReflector auto& re, const char* name, T& value) {
   using Underlying = std::underlying_type_t<T>;
   Underlying raw = static_cast<Underlying>(value);
   re.field(name, raw);
@@ -60,7 +60,7 @@ inline void serialize_field(Reflector auto& re, const char* name, T& value) {
 }
 
 template<typename T>
-inline void serialize_field(Reflector auto& re, const char* name, std::vector<T>& vec) {
+inline void serialize_field(CReflector auto& re, const char* name, std::vector<T>& vec) {
   uint32_t count = static_cast<uint32_t>(vec.size());
   re.begin_array(name, count);
 

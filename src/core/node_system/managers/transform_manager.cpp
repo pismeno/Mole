@@ -371,4 +371,6 @@ void TransformManager::on_scene_clear() noexcept {
   }
 }
 
+void TransformManager::reflect(NodeID node_id, CReflector auto &re) {}
+
 } // mole

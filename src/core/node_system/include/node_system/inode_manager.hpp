@@ -1,6 +1,5 @@
 #pragma once
 
-#include <concepts>
 #include <string>
 
 #include <nlohmann/json.hpp>
@@ -58,11 +57,11 @@ class INodeManager {
   virtual void on_scene_clear() noexcept {};
 };
 
-template <typename Derived>
-class NodeManagerBase : public INodeManager {
+template <typename TDerived>
+class NodeManager : public INodeManager {
  public:
   std::string get_name() const noexcept override {
-    return std::string(Derived::TYPE_ID);
+    return std::string(TDerived::TYPE_ID);
   }
 };
 

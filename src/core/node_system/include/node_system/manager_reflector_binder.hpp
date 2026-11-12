@@ -7,14 +7,15 @@
 #include "node_system/inode_manager.hpp"
 #include "node_system/manager_list.hpp"
 #include "node_system/node_types.hpp"
-#include "utils/reflector.hpp"
+#include "node_system/cmanager_serializable.hpp"
+#include "utils/creflector.hpp"
 
 namespace mole {
 
-template<Reflector Re>
+template<CReflector TReflector>
 class ManagerReflectorBinder {
  public:
-  using ReflectFn = void (*)(INodeManager* mgr, NodeID node_id, Re& re);
+  using ReflectFn = void (*)(INodeManager* mgr, NodeID node_id, TReflector& re);
 
   struct Entry {
     const char* type_id = nullptr;
@@ -30,8 +31,8 @@ class ManagerReflectorBinder {
   }
 
   template<typename... Managers>
-  [[nodiscard]] static ManagerReflectorBinder<Re> create(ManagerList<Managers...>) {
-    ManagerReflectorBinder<Re> binder;
+  [[nodiscard]] static ManagerReflectorBinder<TReflector> create(ManagerList<Managers...>) {
+    ManagerReflectorBinder<TReflector> binder;
     (binder.template bind<Managers>(), ...);
     return binder;
   }
@@ -40,11 +41,11 @@ class ManagerReflectorBinder {
   std::unordered_map<std::string, Entry> map_entries;
 
   template<typename T>
-  requires std::derived_from<T, INodeManager>
+  requires std::derived_from<T, INodeManager> && CManagerSerializable<T, TReflector>
   void bind() {
     map_entries[T::TYPE_ID] = Entry{
       T::TYPE_ID,
-      [](INodeManager* base, NodeID node_id, Re& re) {
+      [](INodeManager* base, NodeID node_id, TReflector& re) {
         static_cast<T*>(base)->reflect(node_id, re);
       }
     };

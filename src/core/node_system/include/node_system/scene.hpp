@@ -16,7 +16,7 @@
 #include "node_system/node.hpp"
 #include "node_system/node_types.hpp"
 #include "node_system/manager_reflector_binder.hpp"
-#include "utils/reflector.hpp"
+#include "utils/creflector.hpp"
 #include "utils/string_hash.hpp"
 
 namespace mole {
@@ -59,14 +59,14 @@ class Scene {
     return static_cast<T*>(get_manager_by_name(T::TYPE_ID));
   }
 
-  template <Reflector Re>
-  void reflect(Re& re, const ManagerReflectorBinder<Re>& binder) {
-    if constexpr (!Re::is_writing()) {
+  template <CReflector TReflector>
+  void reflect(TReflector& re, const ManagerReflectorBinder<TReflector>& binder) {
+    if constexpr (!TReflector::is_writing()) {
       clear_nodes();
     }
 
     std::vector<NodeID> active_nodes;
-    if constexpr (Re::is_writing()) {
+    if constexpr (TReflector::is_writing()) {
       for (uint32_t i = 0; i < get_highest_allocated_node_index(); ++i) {
         NodeID id = NodeID::from(i, generations[i]);
         if (is_node_valid(id)) {
@@ -75,7 +75,7 @@ class Scene {
       }
     }
 
-    uint32_t node_count = Re::is_writing() ? static_cast<uint32_t>(active_nodes.size()) : 0;
+    uint32_t node_count = TReflector::is_writing() ? static_cast<uint32_t>(active_nodes.size()) : 0;
     re.begin_array("nodes", node_count);
 
     struct PendingParent { NodeID child; uint64_t saved_parent_id; };
@@ -89,7 +89,7 @@ class Scene {
       uint64_t saved_parent_id = 0;
       std::string node_type_name_str;
 
-      if constexpr (Re::is_writing()) {
+      if constexpr (TReflector::is_writing()) {
         NodeID current = active_nodes[i];
         saved_id = current.id; 
         
@@ -103,7 +103,7 @@ class Scene {
       re.field("node_type", node_type_name_str);
 
       NodeID runtime_node;
-      if constexpr (!Re::is_writing()) {
+      if constexpr (!TReflector::is_writing()) {
         runtime_node = create_node(NodeID::INVALID, node_type_name_str); 
         
         id_remapping_table[saved_id] = runtime_node;
@@ -137,7 +137,7 @@ class Scene {
     
     re.end_array(); // nodes
 
-    if constexpr (!Re::is_writing()) {
+    if constexpr (!TReflector::is_writing()) {
       for (const auto& pending : pending_parents) {
         auto it = id_remapping_table.find(pending.saved_parent_id);
         if (it != id_remapping_table.end()) {

@@ -18,7 +18,7 @@ target_sources(MoleUtils INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/string_hash.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/counter.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/uuid.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/reflector.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/creflector.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/json_reflector.hpp
 )
 
@@ -104,6 +104,7 @@ target_sources(MoleNodeSystem
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/managers/camera_manager.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/inode_manager.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/cmanager_serializable.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/node.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/render_gatherer.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/node_types.hpp

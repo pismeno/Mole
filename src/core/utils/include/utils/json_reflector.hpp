@@ -6,7 +6,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "utils/reflector.hpp"
+#include "utils/creflector.hpp"
 
 namespace mole {
 
@@ -70,7 +70,7 @@ class JsonReadReflector {
   std::vector<Scope> scope_stack;
 };
 
-static_assert(Reflector<JsonWriteReflector>);
-static_assert(Reflector<JsonReadReflector>);
+static_assert(CReflector<JsonWriteReflector>);
+static_assert(CReflector<JsonReadReflector>);
 
 } // mole

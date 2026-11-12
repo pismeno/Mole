@@ -47,4 +47,6 @@ Result<Camera> CameraManager::get_camera(NodeID node_id) const {
   return cameras.find(node_id)->second;
 }
 
+void CameraManager::reflect(NodeID node_id, CReflector auto &re) {}
+
 } // mole

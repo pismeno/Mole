@@ -65,4 +65,6 @@ Result<void> DrawableManager::set_node_z_index(NodeID node_id, uint32_t z_index)
   return mole::ok();
 }
 
+void DrawableManager::reflect(NodeID node_id, CReflector auto &re) {}
+
 } // mole

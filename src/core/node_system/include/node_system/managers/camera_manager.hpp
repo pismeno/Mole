@@ -8,6 +8,7 @@
 
 #include "node_system/node_types.hpp"
 #include "utils/result.hpp"
+#include "utils/creflector.hpp"
 
 namespace mole {
 
@@ -29,7 +30,7 @@ struct Camera {
     glm::vec4 viewport{0.0f, 0.0f, 1.0f, 1.0f}; // Normalized [x, y, w, h] on target buffer+
 };
 
-class CameraManager : public NodeManagerBase<CameraManager> {
+class CameraManager : public NodeManager<CameraManager> {
 public:
   static constexpr const char* TYPE_ID = "camera_manager";
 
@@ -46,6 +47,8 @@ public:
   void on_node_destroyed(NodeID node_id) noexcept override;
   void on_node_require_manager(NodeID node_id) noexcept override;
   void on_scene_clear() noexcept override;
+
+  void reflect(NodeID node_id, CReflector auto& re);
 private:
   NodeID active_node = NodeID::INVALID;
 

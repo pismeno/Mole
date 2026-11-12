@@ -11,6 +11,7 @@
 
 #include "node_system/node_types.hpp"
 #include "resources/material_types.hpp"
+#include "utils/creflector.hpp"
 #include "utils/result.hpp"
 
 namespace mole {
@@ -23,7 +24,7 @@ struct Drawable {
   uint32_t z_index = 0;
 };
 
-class DrawableManager : public NodeManagerBase<DrawableManager> {
+class DrawableManager : public NodeManager<DrawableManager> {
  public:
   explicit DrawableManager();
 
@@ -52,6 +53,8 @@ class DrawableManager : public NodeManagerBase<DrawableManager> {
   void on_node_destroyed(NodeID node_id) noexcept override;
   void on_node_require_manager(NodeID node_id) noexcept override;
   void on_scene_clear() noexcept override;
+
+  void reflect(NodeID node_id, CReflector auto& re);
  private:
   std::vector<Drawable> drawables;
 };
