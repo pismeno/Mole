@@ -11,20 +11,14 @@
 
 namespace mole {
 
-DrawableManager::DrawableManager() {
-  drawables.resize(MAX_ACTIVE_NODES, Drawable{});
-}
+DrawableManager::DrawableManager() { drawables.resize(MAX_ACTIVE_NODES, Drawable{}); }
 
-void DrawableManager::on_node_destroyed(NodeID node_id) noexcept {
-  drawables[node_id.index()].is_visible = false;
-}
+void DrawableManager::on_node_destroyed(NodeID node_id) noexcept { drawables[node_id.index()].is_visible = false; }
 
-void DrawableManager::on_node_require_manager(NodeID node_id) noexcept {
-  drawables[node_id.index()].is_visible = true;
-}
+void DrawableManager::on_node_require_manager(NodeID node_id) noexcept { drawables[node_id.index()].is_visible = true; }
 
 void DrawableManager::on_scene_clear() noexcept {
-  for (auto &drawable: drawables) {
+  for (auto& drawable : drawables) {
     drawable.is_visible = false;
   }
 }
@@ -65,6 +59,4 @@ Result<void> DrawableManager::set_node_z_index(NodeID node_id, uint32_t z_index)
   return mole::ok();
 }
 
-void DrawableManager::reflect(NodeID node_id, CReflector auto &re) {}
-
-} // mole
+} // namespace mole

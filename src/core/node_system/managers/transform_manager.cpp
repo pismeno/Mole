@@ -150,11 +150,8 @@ void TransformManager::update_node_hierarchy(NodeID node_id, const glm::mat3& pa
     float shx = transform->local_shear.x;
     float shy = transform->local_shear.y;
 
-    glm::mat3 local_mat(
-        sx * (cos - sin * shy), sx * (sin + cos * shy), 0.0f,
-        sy * (cos * shx - sin), sy * (sin * shx + cos), 0.0f,
-        transform->local_position.x, transform->local_position.y, 1.0f
-    );
+    glm::mat3 local_mat(sx * (cos - sin * shy), sx * (sin + cos * shy), 0.0f, sy * (cos * shx - sin),
+                        sy * (sin * shx + cos), 0.0f, transform->local_position.x, transform->local_position.y, 1.0f);
 
     my_global_mat = parent_global_mat * local_mat;
 
@@ -313,7 +310,7 @@ NodeID TransformManager::find_nearest_spatial_parent(NodeID node_id) const noexc
 }
 
 void TransformManager::relink_spatial_children_to_new_parent(NodeID logical_root, NodeID new_spatial_parent) noexcept {
-  std::vector<uint32_t> search_stack = { logical_root.index() };
+  std::vector<uint32_t> search_stack = {logical_root.index()};
 
   while (!search_stack.empty()) {
     uint32_t current_idx = search_stack.back();
@@ -343,9 +340,8 @@ void TransformManager::on_node_reparented(NodeID node_id, NodeID new_parent_id, 
   detach_from_old_logical_parent(node_id, old_parent_id);
   attach_to_new_logical_parent(node_id, new_parent_id);
 
-  logical_node_parents[node_id.index()] = (new_parent_id != NodeID::INVALID)
-                                          ? new_parent_id.index()
-                                          : NodeID::INVALID.index();
+  logical_node_parents[node_id.index()] =
+      (new_parent_id != NodeID::INVALID) ? new_parent_id.index() : NodeID::INVALID.index();
 
   // Next, we walk UP the logical tree to figure out what spatial transform we actually belong to
   NodeID nearest_spatial_parent = find_nearest_spatial_parent(node_id);
@@ -371,6 +367,4 @@ void TransformManager::on_scene_clear() noexcept {
   }
 }
 
-void TransformManager::reflect(NodeID node_id, CReflector auto &re) {}
-
-} // mole
+} // namespace mole

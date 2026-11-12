@@ -18,6 +18,8 @@
 #include "editor/project_assets.hpp"
 #include "editor/states/workspace_state.hpp"
 #include "editor/subprocess.hpp"
+#include "node_system/manager_list.hpp"
+#include "node_system/manager_reflector_binder.hpp"
 #include "node_system/managers/camera_manager.hpp"
 #include "node_system/managers/drawable_manager.hpp"
 #include "node_system/managers/transform_manager.hpp"
@@ -43,7 +45,7 @@
 #include "resources/material_pool.hpp"
 #include "resources/resources_context.hpp"
 #include "resources/view_data.hpp"
-#include "utils/result.hpp"
+#include "utils/json_reflector.hpp"
 #include "utils/uuid.hpp"
 
 namespace mole {
@@ -327,6 +329,17 @@ Result<void> Editor::run() {
       }
     }
 
+    if (inputs.is_key_pressed(KeyCode::J)) {
+      if (scene) {
+        nlohmann::json j;
+        JsonWriteReflector writer(j);
+        auto binder = ManagerReflectorBinder<JsonWriteReflector>::create(
+            ManagerList<TransformManager, DrawableManager, CameraManager>{});
+        scene->reflect(writer, binder);
+        std::cout << j.dump(2) << std::endl;
+      }
+    }
+
     if (state) {
       MaterialID test_mat_id2 = MaterialID::from(1, 0);
 
@@ -447,4 +460,4 @@ Result<void> Editor::shutdown() {
   return mole::ok();
 }
 
-} // mole
+} // namespace mole

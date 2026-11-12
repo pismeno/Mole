@@ -54,7 +54,16 @@ class DrawableManager : public NodeManager<DrawableManager> {
   void on_node_require_manager(NodeID node_id) noexcept override;
   void on_scene_clear() noexcept override;
 
-  void reflect(NodeID node_id, CReflector auto& re);
+  template<CReflector TReflector>
+  void reflect(NodeID node_id, TReflector& re) {
+    if (node_id.index() >= drawables.size()) return;
+    Drawable& drawable = drawables[node_id.index()];
+  
+    re.field("visible", drawable.is_visible);
+    serialize_field(re, "size", drawable.size);
+    //serialize_field(re, "material_id", drawable.material_id); // TODO use uuids for materials
+    re.field("z_index", drawable.z_index);
+  }
  private:
   std::vector<Drawable> drawables;
 };

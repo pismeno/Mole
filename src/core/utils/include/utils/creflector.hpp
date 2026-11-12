@@ -47,6 +47,15 @@ inline void serialize_field(CReflector auto& re, const char* name, glm::vec3& v)
   re.end_object();
 }
 
+inline void serialize_field(CReflector auto& re, const char* name, glm::vec4& v) {
+  re.begin_object(name);
+  re.field("x", v.x);
+  re.field("y", v.y);
+  re.field("z", v.z);
+  re.field("w", v.w);
+  re.end_object();
+}
+
 template<typename T>
 requires std::is_enum_v<T>
 inline void serialize_field(CReflector auto& re, const char* name, T& value) {
@@ -54,7 +63,7 @@ inline void serialize_field(CReflector auto& re, const char* name, T& value) {
   Underlying raw = static_cast<Underlying>(value);
   re.field(name, raw);
 
-  if constexpr (!std::remove_reference_t<decltype(re)>::is_writing) {
+  if constexpr (T::is_writing()) {
     value = static_cast<T>(raw);
   }
 }
@@ -64,7 +73,7 @@ inline void serialize_field(CReflector auto& re, const char* name, std::vector<T
   uint32_t count = static_cast<uint32_t>(vec.size());
   re.begin_array(name, count);
 
-  if constexpr (!std::remove_reference_t<decltype(re)>::is_writing) {
+  if constexpr (T::is_writing()) {
     vec.resize(count);
   }
 

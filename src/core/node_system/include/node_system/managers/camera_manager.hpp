@@ -48,7 +48,27 @@ public:
   void on_node_require_manager(NodeID node_id) noexcept override;
   void on_scene_clear() noexcept override;
 
-  void reflect(NodeID node_id, CReflector auto& re);
+  template<CReflector TReflector>
+  void reflect(NodeID node_id, TReflector& re) {
+    auto it = cameras.find(node_id);
+    if (it == cameras.end()) {
+      if constexpr (TReflector::is_writing()) {
+        cameras[node_id] = Camera{};
+        it = cameras.find(node_id);
+      } else {
+        return;
+      }
+    }
+  
+    Camera& camera = it->second;
+  
+    re.field("size", camera.size);
+    re.field("aspect_ratio", camera.aspect_ratio);
+    re.field("near_plane", camera.near_plane);
+    re.field("far_plane", camera.far_plane);
+    re.field("zoom", camera.zoom);
+    serialize_field(re, "viewport", camera.viewport);
+  }
 private:
   NodeID active_node = NodeID::INVALID;
 

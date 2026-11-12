@@ -9,17 +9,11 @@
 
 namespace mole {
 
-void CameraManager::on_node_require_manager(NodeID node_id) noexcept {
-  cameras[node_id] = Camera{};
-}
+void CameraManager::on_node_require_manager(NodeID node_id) noexcept { cameras[node_id] = Camera{}; }
 
-void CameraManager::on_node_destroyed(NodeID node_id) noexcept {
-  cameras.erase(node_id);
-}
+void CameraManager::on_node_destroyed(NodeID node_id) noexcept { cameras.erase(node_id); }
 
-void CameraManager::on_scene_clear() noexcept {
-  cameras.clear();
-}
+void CameraManager::on_scene_clear() noexcept { cameras.clear(); }
 
 bool CameraManager::has_camera(NodeID node_id) const {
   auto it = cameras.find(node_id);
@@ -32,11 +26,9 @@ Result<void> CameraManager::set_active_camera_node(NodeID node_id) {
   return mole::ok();
 }
 
-NodeID CameraManager::get_active_camera_node() const {
-  return active_node;
-}
+NodeID CameraManager::get_active_camera_node() const { return active_node; }
 
-Result<void> CameraManager::set_camera(NodeID node_id, const Camera &camera) {
+Result<void> CameraManager::set_camera(NodeID node_id, const Camera& camera) {
   if (!has_camera(node_id)) return mole::fail("Provided node has no Camera");
   cameras[node_id] = camera;
   return mole::ok();
@@ -47,6 +39,4 @@ Result<Camera> CameraManager::get_camera(NodeID node_id) const {
   return cameras.find(node_id)->second;
 }
 
-void CameraManager::reflect(NodeID node_id, CReflector auto &re) {}
-
-} // mole
+} // namespace mole

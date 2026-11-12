@@ -57,7 +57,21 @@ class TransformManager : public NodeManager<TransformManager> {
   void on_node_reparented(NodeID node_id, NodeID new_parent_id, NodeID old_parent_id) noexcept override;
   void on_scene_clear() noexcept override;
 
-  void reflect(NodeID node_id, CReflector auto& re);
+  template<CReflector TReflector>
+  void reflect(NodeID node_id, TReflector& re) {
+    TransformInfo* transform = get_transform(node_id.index());
+    if (!transform) return;
+  
+    serialize_field(re, "position", transform->local_position);
+    serialize_field(re, "scale", transform->local_scale);
+    serialize_field(re, "shear", transform->local_shear);
+    re.field("rotation", transform->local_rotation);
+  
+    if constexpr (TReflector::is_writing()) {
+      transform->is_dirty = true;
+      mark_spatial_children_dirty(node_id);
+    }
+  }
  private:
   /**
    * @brief private information for nodes
