@@ -4,9 +4,10 @@
 
 #include <unordered_map>
 
+#include <glm/vec4.hpp>
+
 #include "node_system/node_types.hpp"
 #include "utils/result.hpp"
-#include "resources/view_data.hpp"
 
 namespace mole {
 

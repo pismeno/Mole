@@ -14,12 +14,10 @@ namespace mole {
 template<Reflector Re>
 class ManagerReflectorBinder {
  public:
-  using ReflectFn = void (*)(INodeManager* mgr, NodeID node_id, Re& ar);
-  using HasNodeFn = bool (*)(const INodeManager* mgr, NodeID node_id);
+  using ReflectFn = void (*)(INodeManager* mgr, NodeID node_id, Re& re);
 
   struct Entry {
     const char* type_id = nullptr;
-    HasNodeFn has_node = nullptr;
     ReflectFn reflect = nullptr;
   };
 
@@ -37,25 +35,19 @@ class ManagerReflectorBinder {
     (binder.template bind<Managers>(), ...);
     return binder;
   }
+
  private:
   std::unordered_map<std::string, Entry> map_entries;
 
-  template<SerializableManager T>
+  template<typename T>
+  requires std::derived_from<T, INodeManager>
   void bind() {
-    Entry entry{
+    map_entries[T::TYPE_ID] = Entry{
       T::TYPE_ID,
-      [](const INodeManager* base, NodeID node_id) -> bool {
-        return static_cast<const T*>(base)->has_node(node_id);
-      },
-      [](INodeManager* base, NodeID node_id, Re& ar) {
-        auto* self = static_cast<T*>(base);
-        if constexpr (!Re::is_writing()) {
-          self->on_node_require_manager(node_id);
-        }
-        self->reflect(node_id, ar);
+      [](INodeManager* base, NodeID node_id, Re& re) {
+        static_cast<T*>(base)->reflect(node_id, re);
       }
     };
-    map_entries[T::TYPE_ID] = entry;
   }
 };
 

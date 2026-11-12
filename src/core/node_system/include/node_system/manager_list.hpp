@@ -4,7 +4,7 @@
 
 namespace mole {
 
-template<SerializableManager... Managers>
+template<std::derived_from<INodeManager>... Managers>
 struct ManagerList {};
 
 } // mole

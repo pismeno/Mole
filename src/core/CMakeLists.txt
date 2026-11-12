@@ -11,15 +11,15 @@ add_compile_definitions(SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS=1)
 add_library(MoleUtils INTERFACE)
 
 target_sources(MoleUtils INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/utils/json_read_archive.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/utils/json_write_archive.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/json_read_reflector.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/json_write_reflector.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/result.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/string_hash.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/counter.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/uuid.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/archive.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/json_archive.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/reflector.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/json_reflector.hpp
 )
 
 target_include_directories(MoleUtils INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/utils/include)
@@ -109,6 +109,7 @@ target_sources(MoleNodeSystem
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/node_types.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/scene.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/scene_factory.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/manager_reflector_binder.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/managers/drawable_manager.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/managers/transform_manager.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/node_system/include/node_system/managers/camera_manager.hpp
