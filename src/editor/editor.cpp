@@ -18,13 +18,13 @@
 #include "editor/project_assets.hpp"
 #include "editor/states/workspace_state.hpp"
 #include "editor/subprocess.hpp"
+#include "node_system/engine_managers.hpp"
 #include "node_system/managers/camera_manager.hpp"
 #include "node_system/managers/drawable_manager.hpp"
 #include "node_system/managers/transform_manager.hpp"
 #include "node_system/node_system_context.hpp"
 #include "node_system/render_gatherer.hpp"
 #include "node_system/scene.hpp"
-#include "node_system/engine_managers.hpp"
 #include "node_system/scene_factory.hpp"
 #include "osal/ifile_system.hpp"
 #include "osal/inputs.hpp"
@@ -90,23 +90,22 @@ Result<void> Editor::init() {
   asset_manager = std::move(r_create_am).value();
   resources_context.asset_manager = asset_manager.get();
 
-  material_pool = std::make_unique<MaterialPool>();
+  material_pool = std::make_unique<MaterialPool>(resources_context);
   resources_context.material_pool = material_pool.get();
+
+  render_gatherer = std::make_unique<RenderGatherer>();
+  manager_reflector_binder_factory = std::make_unique<ManagerReflectorBinderFactory<EngineManagers>>();
 
   node_system_context = {
       .resources_context = &resources_context,
+      .render_gatherer = render_gatherer.get(),
+      .manager_reflector_binder_factory = manager_reflector_binder_factory.get(),
   };
 
   auto r_create_sf = SceneFactory::create(node_system_context);
   if (!r_create_sf) return mole::fail(r_create_sf.error());
   scene_factory = std::move(r_create_sf).value();
   node_system_context.scene_factory = scene_factory.get();
-
-  render_gatherer = std::make_unique<RenderGatherer>();
-  node_system_context.render_gatherer = render_gatherer.get();
-
-  manager_reflector_binder_factory = std::make_unique<ManagerReflectorBinderFactory<EngineManagers>>();
-  node_system_context.manager_reflector_binder_factory = manager_reflector_binder_factory.get();
 
   scene_factory->register_manager<TransformManager>();
   scene_factory->register_manager<DrawableManager>();
@@ -126,15 +125,14 @@ Result<void> Editor::init() {
   rendering_context.packed_material_cache = packed_material_cache.get();
 
   process_orchestrator = std::make_unique<ProcessOrchestrator>();
-  manager_reflector_binder_factory = std::make_unique<ManagerReflectorBinderFactory<EngineManagers>>();
 
   context = {
-    .node_system_context = &node_system_context,
-    .rendering_context = &rendering_context,
-    .os_context = &os_context,
-    .resources_context = &resources_context,
-    
-    .process_orchestrator = process_orchestrator.get(),
+      .node_system_context = &node_system_context,
+      .rendering_context = &rendering_context,
+      .os_context = &os_context,
+      .resources_context = &resources_context,
+
+      .process_orchestrator = process_orchestrator.get(),
   };
 
   RendererOptions renderer_options{ERendererType::Vulkan, window->get_native_handle(), window->get_framebuffer_width(),
@@ -303,22 +301,20 @@ Result<void> Editor::load_workspace() {
   auto r_z_3 = drawable_manager->set_node_z_index(child_node2, 2);
   if (!r_z_3) return r_z_3;
 
-  auto r_res_get_scene = workspace_state->get_project_assets().resolve("scene.json", EAssetType::Text);
-  if (!r_res_get_scene) return mole::fail(r_res_get_scene.error());
-  auto r_get_scene_asset = asset_manager->acquire<TextAsset>(r_res_get_scene.value());
-  if (!r_get_scene_asset) return mole::fail(r_get_scene_asset.error());
-  AssetHandle<TextAsset> scene_json_ass = std::move(r_get_scene_asset).value();
-  
-  nlohmann::json scene_json = nlohmann::json::parse(scene_json_ass->as_string_view());
-  JsonReadReflector reader(scene_json);
-  auto r_load = scene_factory->load_scene(reader);
-  if (!r_load) {
-    std::cerr << "failed to load scene: " << r_load.error() << std::endl;
+  /* 
+  auto r_uuid = workspace_state->get_project_assets().resolve("scene.json", EAssetType::Scene);
+  if (!r_uuid) return mole::fail(r_uuid.error());
+  auto r_scene_asset = asset_manager->acquire<SceneAsset>(r_uuid.value());
+  if (!r_scene_asset) return mole::fail(r_scene_asset.error());
+  auto r_instantiate = scene_factory->instantiate_scene(r_scene_asset.value());
+  if (!r_instantiate) {
+    std::cerr << "failed to load scene: " << r_instantiate.error() << std::endl;
   } else {
-    scene = std::move(r_load).value();
+    scene = std::move(r_instantiate).value();
     std::cout << "loaded scene successfuly" << std::endl;
   }
-  
+  */
+
   return mole::ok();
 }
 
@@ -428,7 +424,7 @@ Result<void> Editor::run() {
       // Fallback before the workspace is loaded via 'L' (removed, but kept for safety)
       view_data.projection = glm::mat4(1.0f);
       view_data.view = glm::mat4(1.0f);
-      view_data.viewProjection = glm::mat4(1.0f);
+      view_data.viewProjection = view_data.projection * view_data.view;
     }
     // --------------------------
 
@@ -479,4 +475,4 @@ Result<void> Editor::shutdown() {
   return mole::ok();
 }
 
-} // namespace mole
+} // mole

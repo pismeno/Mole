@@ -9,6 +9,7 @@ add_executable(MoleTests
         material_packer_test.cpp
         file_system_test.cpp
         asset_manager_test.cpp
+        scene_material_asset_test.cpp
 )
 
 target_link_libraries(MoleTests

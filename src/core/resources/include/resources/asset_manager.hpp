@@ -91,7 +91,7 @@ private:
     auto it = asset_pools.find(T::ASSET_TYPE);
 
     if (it == asset_pools.end()) {
-      it = asset_pools.emplace(T::ASSET_TYPE, std::make_unique<AssetPool<T>>(file_system)).first;
+      it = asset_pools.emplace(T::ASSET_TYPE, std::make_unique<AssetPool<T>>(file_system, this)).first;
     }
 
     return static_cast<AssetPool<T>*>(it->second.get());
@@ -101,7 +101,7 @@ private:
 
   std::unordered_map<EAssetType, std::unique_ptr<IAssetPool>> asset_pools;
 
-  IFileSystem* file_system = nullptr;
+  IFileSystem* file_system;
 };
 
-} // namespace mole
+} // mole

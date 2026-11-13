@@ -11,9 +11,13 @@
 
 #include "node_system/inode_resolver.hpp"
 #include "node_system/node_types.hpp"
+#include "resources/asset_manager.hpp"
+#include "resources/asset_types.hpp"
+#include "resources/material_pool.hpp"
 #include "resources/material_types.hpp"
 #include "utils/creflector.hpp"
 #include "utils/result.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
 
@@ -25,13 +29,17 @@ struct Drawable {
   uint32_t z_index = 0;
 };
 
+struct NodeSystemContext;
+
 class DrawableManager : public NodeManager<DrawableManager> {
- public:
-  explicit DrawableManager();
+public:
+  explicit DrawableManager(const NodeSystemContext& context);
 
   static constexpr const char* TYPE_ID = "drawable_manager";
 
-  [[nodiscard]] inline bool has_drawable(NodeID node_id) const noexcept { return drawables[node_id.index()].is_visible; }
+  [[nodiscard]] inline bool has_drawable(NodeID node_id) const noexcept {
+    return drawables[node_id.index()].is_visible;
+  }
 
   /**
    * Gets the draw information of the given node.
@@ -55,18 +63,41 @@ class DrawableManager : public NodeManager<DrawableManager> {
   void on_node_require_manager(NodeID node_id) noexcept override;
   void on_scene_clear() noexcept override;
 
-  template<CReflector TReflector>
+  template <CReflector TReflector>
   void reflect(NodeID node_id, TReflector& re, INodeResolver& node_resolver) {
     if (node_id.index() >= drawables.size()) return;
     Drawable& drawable = drawables[node_id.index()];
-  
+
     serialize(re, "visible", drawable.is_visible);
     serialize(re, "size", drawable.size);
-    //serialize(re, "material_id", drawable.material_id); // TODO use uuids for materials
     serialize(re, "z_index", drawable.z_index);
+
+    if constexpr (TReflector::is_writing()) {
+      UUID mat_uuid{};
+      if (drawable.material_id != MaterialID::INVALID) {
+        mat_uuid = material_pool->get_uuid(drawable.material_id);
+      }
+      serialize(re, "material_uuid", mat_uuid);
+    } else {
+      UUID mat_uuid{};
+      serialize(re, "material_uuid", mat_uuid);
+      if (mat_uuid.is_nil()) {
+        serialize(re, "material_id", mat_uuid);
+      }
+      if (!mat_uuid.is_nil()) {
+        auto r_mat_asset = asset_manager->acquire<MaterialAsset>(mat_uuid);
+        if (r_mat_asset) {
+          drawable.material_id = material_pool->acquire_material(r_mat_asset.value());
+        }
+      }
+    }
   }
- private:
+
+private:
   std::vector<Drawable> drawables;
+
+  MaterialPool* material_pool;
+  AssetManager* asset_manager;
 };
 
 } // mole

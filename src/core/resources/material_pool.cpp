@@ -6,10 +6,15 @@
 #include <string_view>
 #include <utility>
 
+#include "resources/asset_types.hpp"
 #include "resources/material.hpp"
 #include "resources/material_types.hpp"
+#include "resources/resources_context.hpp"
 
 namespace mole {
+
+MaterialPool::MaterialPool(const ResourcesContext& context)
+: asset_manager(context.asset_manager) {}
 
 const Material& MaterialPool::get(MaterialID material_id) const {
   assert(is_valid(material_id) && "Attempting to get an invalid Material!"); // TODO return fallback material here
@@ -53,15 +58,42 @@ bool MaterialPool::is_valid(std::string_view string_material_id) const {
 }
 
 MaterialID MaterialPool::add(std::string_view string_id, Material material) {
-  // If it already exists and is valid, overwrite it
-  auto it = string_id_lookup.find(string_id);
-  if (it != string_id_lookup.end()) {
-    MaterialID existing_id = it->second;
-    if (is_valid(existing_id)) {
-      uint32_t index = existing_id.index();
-      materials[index] = std::move(material);
-      material_versions[index]++; // Bump version since data changed
-      return existing_id;
+  return add(string_id, std::move(material), UUID{});
+}
+
+MaterialID MaterialPool::add(std::string_view string_id, Material material, UUID uuid) {
+  // If uuid is valid, check if it already exists and is valid
+  if (!uuid.is_nil()) {
+    auto it = uuid_to_id.find(uuid);
+    if (it != uuid_to_id.end()) {
+      MaterialID existing_id = it->second;
+      if (is_valid(existing_id)) {
+        uint32_t index = existing_id.index();
+        materials[index] = std::move(material);
+        material_versions[index]++;
+        if (!string_id.empty()) {
+          string_id_lookup[std::string(string_id)] = existing_id;
+        }
+        return existing_id;
+      }
+    }
+  }
+
+  // If string_id is provided, check if it already exists and is valid
+  if (!string_id.empty()) {
+    auto it = string_id_lookup.find(string_id);
+    if (it != string_id_lookup.end()) {
+      MaterialID existing_id = it->second;
+      if (is_valid(existing_id)) {
+        uint32_t index = existing_id.index();
+        materials[index] = std::move(material);
+        material_versions[index]++;
+        if (!uuid.is_nil()) {
+          material_uuids[index] = uuid;
+          uuid_to_id[uuid] = existing_id;
+        }
+        return existing_id;
+      }
     }
   }
 
@@ -76,17 +108,56 @@ MaterialID MaterialPool::add(std::string_view string_id, Material material) {
     materials.emplace_back();
     generations.push_back(0);
     material_versions.push_back(0);
+    material_uuids.push_back(UUID{});
   }
 
   // Move the material into the slot and bump the version
   materials[index] = std::move(material);
   material_versions[index]++;
+  material_uuids[index] = uuid;
 
-  // Create the handle and register it in the lookup table
+  // Create the handle and register it in the lookup tables
   MaterialID new_id = MaterialID::from(index, generations[index]);
-  string_id_lookup[std::string(string_id)] = new_id;
+  if (!string_id.empty()) {
+    string_id_lookup[std::string(string_id)] = new_id;
+  }
+  if (!uuid.is_nil()) {
+    uuid_to_id[uuid] = new_id;
+  }
 
   return new_id;
+}
+
+MaterialID MaterialPool::acquire_material(const AssetHandle<MaterialAsset>& asset) {
+  if (!asset.is_valid()) {
+    return MaterialID::INVALID;
+  }
+
+  UUID uuid = asset.get_uuid();
+  if (!uuid.is_nil()) {
+    auto it = uuid_to_id.find(uuid);
+    if (it != uuid_to_id.end() && is_valid(it->second)) {
+      return it->second;
+    }
+  }
+
+  Material mat;
+  mat.vertex_shader = asset->vertex_shader;
+  mat.fragment_shader = asset->fragment_shader;
+  mat.properties = asset->properties;
+
+  return add(uuid.to_string(), std::move(mat), uuid);
+}
+
+UUID MaterialPool::get_uuid(MaterialID material_id) const {
+  if (!is_valid(material_id)) {
+    return UUID{};
+  }
+  uint32_t index = material_id.index();
+  if (index >= material_uuids.size()) {
+    return UUID{};
+  }
+  return material_uuids[index];
 }
 
 void MaterialPool::destroy(MaterialID material_id) {
@@ -95,6 +166,12 @@ void MaterialPool::destroy(MaterialID material_id) {
   }
 
   uint32_t index = material_id.index();
+
+  // Invalidate the UUID lookup
+  if (index < material_uuids.size() && !material_uuids[index].is_nil()) {
+    uuid_to_id.erase(material_uuids[index]);
+    material_uuids[index] = UUID{};
+  }
 
   // Invalidate the handle by incrementing the generation
   generations[index]++;
@@ -111,16 +188,9 @@ void MaterialPool::destroy(MaterialID material_id) {
 }
 
 void MaterialPool::destroy(std::string_view string_material_id) {
-  auto it = string_id_lookup.find(string_material_id);
-  if (it != string_id_lookup.end()) {
-    MaterialID id = it->second;
-    string_id_lookup.erase(it); // Erase first to avoid double lookup
-
-    if (is_valid(id)) {
-      uint32_t index = id.index();
-      generations[index]++;
-      recycled_indices.push_back(index);
-    }
+  MaterialID id = get_id(string_material_id);
+  if (is_valid(id)) {
+    destroy(id);
   }
 }
 
@@ -130,6 +200,10 @@ void MaterialPool::clear() {
   }
 
   string_id_lookup.clear();
+  uuid_to_id.clear();
+  for (UUID& u : material_uuids) {
+    u = UUID{};
+  }
 
   recycled_indices.clear();
   for (uint32_t i = next_unused_index; i > 0; --i) {
@@ -141,8 +215,6 @@ void MaterialPool::set_property(MaterialID material_id, std::string_view propert
   if (is_valid(material_id)) {
     uint32_t index = material_id.index();
 
-    // Assuming your Material class has a set_property method.
-    // Adjust this line based on your actual Material API.
     auto& props = materials[index].properties;
     if (auto it = props.find(property); it != props.end()) {
       it->second = std::move(value);
@@ -155,9 +227,10 @@ void MaterialPool::set_property(MaterialID material_id, std::string_view propert
   }
 }
 
-void MaterialPool::set_property(std::string_view string_material_id, std::string_view property, MaterialProperty value) {
+void MaterialPool::set_property(std::string_view string_material_id, std::string_view property,
+                                MaterialProperty value) {
   MaterialID id = get_id(string_material_id);
-  set_property(id, property, std::move(value)); // Fall through to the ID-based function
+  set_property(id, property, std::move(value));
 }
 
 } // mole

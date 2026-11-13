@@ -3,7 +3,12 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
+
+#include "resources/asset_handle.hpp"
+#include "resources/material.hpp"
+#include "utils/string_hash.hpp"
 
 namespace mole {
 
@@ -18,6 +23,8 @@ enum class EAssetType : uint32_t {
   TessControlShader = 7,
   TessEvaluationShader = 8,
   Image = 9,
+  Scene = 10,
+  Material = 11,
 };
 
 struct AssetHeader {
@@ -110,4 +117,34 @@ struct TessEvaluationShaderAsset : ShaderAsset {
   static constexpr const EAssetType ASSET_TYPE = EAssetType::TessEvaluationShader;
 };
 
-} // namespace mole
+/**
+ * @brief Scene asset containing serialized scene payload.
+ */
+struct SceneAsset : Asset {
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::Scene;
+
+  std::vector<uint8_t> payload;
+
+  [[nodiscard]] const inline size_t get_size_bytes() const noexcept { return payload.size(); }
+  [[nodiscard]] std::string_view as_string_view() const noexcept {
+    if (payload.empty()) return {};
+    return std::string_view(reinterpret_cast<const char*>(payload.data()), payload.size());
+  }
+
+  static const SceneAsset FALLBACK;
+};
+
+/**
+ * @brief Material asset containing shader handles and property definitions.
+ */
+struct MaterialAsset : Asset {
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::Material;
+
+  AssetHandle<VertexShaderAsset> vertex_shader;
+  AssetHandle<FragmentShaderAsset> fragment_shader;
+  std::unordered_map<std::string, MaterialProperty, StringHash, std::equal_to<>> properties;
+
+  static const MaterialAsset FALLBACK;
+};
+
+} // mole

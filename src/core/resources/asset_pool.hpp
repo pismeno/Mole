@@ -15,6 +15,7 @@
 namespace mole {
 
 class IFileSystem;
+class AssetManager;
 
 Result<std::vector<uint8_t>> read_asset_payload(IFileSystem* file_system, UUID uuid);
 
@@ -32,7 +33,8 @@ public:
 template <typename T>
 class AssetPool : public IAssetPool {
 public:
-  AssetPool(IFileSystem* file_system) : file_system(file_system) {}
+  AssetPool(IFileSystem* file_system, AssetManager* asset_manager)
+      : file_system(file_system), asset_manager(asset_manager) {}
 
   Result<AssetHandle<T>> load(UUID uuid) {
     // Check if the asset is already loaded
@@ -167,6 +169,9 @@ public:
 protected:
   Result<T> parse_asset(std::string_view filepath, std::vector<uint8_t> raw_bytes);
 
+  IFileSystem* file_system;
+  AssetManager* asset_manager;
+
 private:
   enum class EAssetState {
     Loaded,
@@ -188,8 +193,6 @@ private:
   std::vector<UUID> uuids;
   std::vector<uint32_t> free_indices;
   std::unordered_map<UUID, uint32_t> cache;
-
-  IFileSystem* file_system;
 };
 
 template <typename T>
@@ -202,4 +205,10 @@ inline Result<T> AssetPool<T>::parse_asset(std::string_view filepath, std::vecto
 template <>
 Result<ImageAsset> AssetPool<ImageAsset>::parse_asset(std::string_view filepath, std::vector<uint8_t> raw_bytes);
 
-} // namespace mole
+template <>
+Result<SceneAsset> AssetPool<SceneAsset>::parse_asset(std::string_view filepath, std::vector<uint8_t> raw_bytes);
+
+template <>
+Result<MaterialAsset> AssetPool<MaterialAsset>::parse_asset(std::string_view filepath, std::vector<uint8_t> raw_bytes);
+
+} // mole

@@ -12,26 +12,24 @@
 
 #include <nlohmann/json.hpp>
 
-#include "node_system/inode_resolver.hpp"
 #include "node_system/inode_manager.hpp"
+#include "node_system/inode_resolver.hpp"
 #include "node_system/node.hpp"
-#include "node_system/node_system_context.hpp"
 #include "node_system/node_types.hpp"
-#include "node_system/engine_managers.hpp"
-#include "node_system/manager_reflector_binder_factory.hpp"
+#include "resources/asset_handle.hpp"
+#include "resources/asset_types.hpp"
+#include "utils/result.hpp"
 #include "utils/string_hash.hpp"
 #include "utils/uuid.hpp"
-#include "utils/result.hpp"
 
 namespace mole {
 
 class SceneFactory;
 
 class Scene : public INodeResolver {
-
   friend class SceneFactory;
-  
- public:
+
+public:
   explicit Scene(std::string scene_type_name);
   ~Scene();
 
@@ -41,7 +39,7 @@ class Scene : public INodeResolver {
   const NodeID get_nodes_parent(const NodeID node_id) const noexcept;
   std::vector<NodeID> get_nodes_children(const NodeID node_id) const noexcept;
 
-  Result<UUID> get_uuid(NodeID node_id) const override;    
+  Result<UUID> get_uuid(NodeID node_id) const override;
   NodeID get_node_by_uuid(const UUID uuid) const override;
 
   [[nodiscard]] NodeID create_node(NodeID parent_id, std::string_view node_type);
@@ -69,12 +67,15 @@ class Scene : public INodeResolver {
     return static_cast<T*>(get_manager_by_name(T::TYPE_ID));
   }
 
- private:
+  void set_source_asset(AssetHandle<SceneAsset> asset);
+  [[nodiscard]] AssetHandle<SceneAsset> get_source_asset() const;
+
+private:
   std::string scene_type_name;
 
   [[nodiscard]] NodeID generate_id();
 
-  std::atomic<uint32_t> next_unused_id {0};
+  std::atomic<uint32_t> next_unused_id{0};
   std::vector<uint32_t> recycled_ids;
   std::vector<uint32_t> generations; // Index = the raw array slot, Value = the current active generation
   std::vector<Node> nodes;
@@ -91,6 +92,8 @@ class Scene : public INodeResolver {
   };
 
   std::unordered_map<std::string, NodeDefinition, StringHash, std::equal_to<>> node_type_definitions;
+
+  AssetHandle<SceneAsset> source_scene_asset;
 };
 
 } // mole

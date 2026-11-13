@@ -10,14 +10,26 @@
 
 #include <nlohmann/json.hpp>
 
+#include "node_system/managers/drawable_manager.hpp"
 #include "node_system/node_system_context.hpp"
 #include "node_system/scene.hpp"
+#include "osal/ifile_system.hpp"
 #include "osal/os_context.hpp"
 #include "resources/asset_manager.hpp"
+#include "resources/material_pool.hpp"
 #include "resources/resources_context.hpp"
+#include "utils/json_reflector.hpp"
+#include "utils/payload_utils.hpp"
 #include "utils/result.hpp"
 
 namespace mole {
+
+SceneFactory::SceneFactory(const NodeSystemContext& context)
+    : context(&context),
+      asset_manager(context.resources_context->asset_manager),
+      material_pool(context.resources_context->material_pool),
+      file_system(context.resources_context->os_context->file_system),
+      manager_reflector_binder_factory(context.manager_reflector_binder_factory) {}
 
 SceneFactory::~SceneFactory() = default;
 
@@ -28,17 +40,7 @@ void SceneFactory::register_manager_factory(std::string_view name, ManagerFactor
 }
 
 Result<std::unique_ptr<SceneFactory>> SceneFactory::create(const NodeSystemContext& context) {
-  auto factory = std::unique_ptr<SceneFactory>(new SceneFactory());
-  auto r_init = factory->init(context);
-  if (!r_init) return mole::fail(r_init.error());
-  return std::move(factory);
-}
-
-Result<void> SceneFactory::init(const NodeSystemContext& context) {
-  asset_manager = context.resources_context->asset_manager;
-  file_system = context.resources_context->os_context->file_system;
-  manager_reflector_binder_factory = context.manager_reflector_binder_factory;
-  return mole::ok();
+  return std::unique_ptr<SceneFactory>(new SceneFactory(context));
 }
 
 Result<std::unique_ptr<Scene>> SceneFactory::create_scene(const std::string& scene_type) const {
@@ -59,7 +61,8 @@ Result<std::unique_ptr<Scene>> SceneFactory::create_scene(const std::string& sce
     }
 
     ManagerFactory manager_factory = manager_factory_it->second;
-    scene->add_manager(manager_factory());
+    auto mgr = manager_factory();
+    scene->add_manager(std::move(mgr));
   }
 
   for (auto& node_name : scene_definition.allowed_nodes) {
@@ -73,6 +76,32 @@ Result<std::unique_ptr<Scene>> SceneFactory::create_scene(const std::string& sce
   }
 
   return std::move(scene);
+}
+
+Result<std::unique_ptr<Scene>> SceneFactory::instantiate_scene(AssetHandle<SceneAsset> scene_asset) const {
+  if (!scene_asset.is_valid()) {
+    return mole::fail("Invalid SceneAsset handle");
+  }
+
+  if (!is_json_payload(scene_asset->payload)) {
+    return mole::fail("Binary payload format not yet supported");
+  }
+
+  std::string_view json_str(reinterpret_cast<const char*>(scene_asset->payload.data()), scene_asset->payload.size());
+  nlohmann::json json = nlohmann::json::parse(json_str, nullptr, false);
+  if (json.is_discarded()) {
+    return mole::fail("Failed to parse scene JSON");
+  }
+
+  JsonReadReflector reader(json);
+  auto r_scene = load_scene(reader);
+  if (!r_scene) {
+    return mole::fail(r_scene.error());
+  }
+
+  std::unique_ptr<Scene> scene = std::move(r_scene).value();
+  scene->set_source_asset(scene_asset);
+  return scene;
 }
 
 Result<void> SceneFactory::load_scene_definitions_from(const std::string_view definitions_source) {
@@ -104,7 +133,8 @@ Result<void> SceneFactory::load_scene_definitions_from(const std::string_view de
         }
 
         if (manager_registry.find(manager_name.get<std::string>()) == manager_registry.end()) {
-          return mole::fail("Node definition 'managers' array contains unknown manager '" + manager_name.get<std::string>() + "' in source.");
+          return mole::fail("Node definition 'managers' array contains unknown manager '" +
+                            manager_name.get<std::string>() + "' in source.");
         }
       }
 
@@ -154,7 +184,8 @@ Result<void> SceneFactory::load_node_definitions_from(const std::string_view def
         }
 
         if (manager_registry.find(manager_name.get<std::string>()) == manager_registry.end()) {
-          return mole::fail("Node definition 'managers' array contains unknown manager '" + manager_name.get<std::string>() + "' in source.");
+          return mole::fail("Node definition 'managers' array contains unknown manager '" +
+                            manager_name.get<std::string>() + "' in source.");
         }
       }
 

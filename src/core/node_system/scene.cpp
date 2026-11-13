@@ -81,13 +81,12 @@ Result<UUID> Scene::get_uuid(NodeID node_id) const {
 NodeID Scene::get_node_by_uuid(const UUID uuid) const {
   auto it = uuid_to_node_id.find(uuid);
   if (it != uuid_to_node_id.end()) {
-    
     if (is_node_valid(it->second)) {
       return it->second;
     }
   }
 
-  return NodeID::INVALID; 
+  return NodeID::INVALID;
 }
 
 [[nodiscard]] NodeID Scene::create_node(NodeID parent_id, std::string_view node_type) {
@@ -206,22 +205,22 @@ void Scene::reparent_node(NodeID node_id, NodeID new_parent_id) {
     return;
   }
 
-  Node *child = &nodes[node_id.index()];
-  Node *new_parent = &nodes[new_parent_id.index()];
+  Node* child = &nodes[node_id.index()];
+  Node* new_parent = &nodes[new_parent_id.index()];
 
   if (!child) {
-    std::cerr <<"Node with provided ID not found";
+    std::cerr << "Node with provided ID not found";
     return;
   }
 
   if (!new_parent) {
-    std::cerr <<"Parent node with provided ID not found";
+    std::cerr << "Parent node with provided ID not found";
     return;
   }
 
   NodeID old_parent_id = child->parent_id;
   if (child->parent_id != NodeID::INVALID) {
-    Node *old_parent = &nodes[child->parent_id.index()];
+    Node* old_parent = &nodes[child->parent_id.index()];
     if (old_parent) {
       auto& siblings = old_parent->children_ids;
       siblings.erase(std::remove(siblings.begin(), siblings.end(), node_id), siblings.end());
@@ -270,7 +269,8 @@ void Scene::add_node_type(std::string_view node_type, std::span<const std::strin
   for (auto& manager_name : node_managers) {
     auto manager_it = managers_map.find(manager_name);
     if (manager_it == managers_map.end()) {
-      std::cerr << "Node type '" << std::string(node_type) << "' requires manager '" << std::string(manager_name) << "' which is not registered";
+      std::cerr << "Node type '" << std::string(node_type) << "' requires manager '" << std::string(manager_name)
+                << "' which is not registered";
       return;
     }
 
@@ -279,5 +279,9 @@ void Scene::add_node_type(std::string_view node_type, std::span<const std::strin
 
   node_type_definitions.emplace(node_type, std::move(node_definition));
 }
+
+void Scene::set_source_asset(AssetHandle<SceneAsset> asset) { source_scene_asset = std::move(asset); }
+
+AssetHandle<SceneAsset> Scene::get_source_asset() const { return source_scene_asset; }
 
 } // mole
