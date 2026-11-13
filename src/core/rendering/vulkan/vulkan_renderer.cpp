@@ -365,9 +365,14 @@ void VulkanRenderer::end_pass() {
     if (batch.quad_count == 0) continue;
 
     MaterialID batch_mat_id = batch_materials_pool[batch.first_material_offset];
-    const Material& mat = material_pool->get(batch_mat_id);
+    auto r_vert = material_pool->get_vertex_shader(batch_mat_id);
+    auto r_frag = material_pool->get_fragment_shader(batch_mat_id);
+    if (!r_vert || !r_frag) {
+      std::cerr << "VulkanRenderer::end_pass failed to get shaders for batch" << std::endl;
+      continue;
+    }
 
-    auto r_get_pipeline = pipeline_cache->get(mat.vertex_shader, mat.fragment_shader);
+    auto r_get_pipeline = pipeline_cache->get(r_vert.value(), r_frag.value());
     if (!r_get_pipeline) {
       std::cerr << "VulkanRenderer::end_pass failed to get pipeline: " << r_get_pipeline.error() << std::endl;
       continue;
@@ -536,11 +541,13 @@ void VulkanRenderer::build_batches() {
                        return a.z_index < b.z_index; // Primary: Z-Index (Back to front)
                      }
 
-                     const Material& mat_a = material_pool->get(a.material_id);
-                     const Material& mat_b = material_pool->get(b.material_id);
+                     auto r_va = material_pool->get_vertex_shader(a.material_id);
+                     auto r_fa = material_pool->get_fragment_shader(a.material_id);
+                     auto r_vb = material_pool->get_vertex_shader(b.material_id);
+                     auto r_fb = material_pool->get_fragment_shader(b.material_id);
 
-                     CombinedShaderKey shaders_a{ mat_a.vertex_shader.get_packed_id(), mat_a.fragment_shader.get_packed_id() };
-                     CombinedShaderKey shaders_b{ mat_b.vertex_shader.get_packed_id(), mat_b.fragment_shader.get_packed_id() };
+                     CombinedShaderKey shaders_a{ r_va ? r_va.value().get_packed_id() : 0, r_fa ? r_fa.value().get_packed_id() : 0 };
+                     CombinedShaderKey shaders_b{ r_vb ? r_vb.value().get_packed_id() : 0, r_fb ? r_fb.value().get_packed_id() : 0 };
 
                      if (shaders_a != shaders_b) {
                        return shaders_a < shaders_b; // Secondary: Shader ID
@@ -565,8 +572,9 @@ void VulkanRenderer::build_batches() {
     }
     uint32_t gpu_material_index = r_get_mat_idx.value();
 
-    const Material& mat = material_pool->get(cmd.material_id);
-    CombinedShaderKey shader_key{ mat.vertex_shader.get_packed_id(), mat.fragment_shader.get_packed_id() };
+    auto r_vert = material_pool->get_vertex_shader(cmd.material_id);
+    auto r_frag = material_pool->get_fragment_shader(cmd.material_id);
+    CombinedShaderKey shader_key{ r_vert ? r_vert.value().get_packed_id() : 0, r_frag ? r_frag.value().get_packed_id() : 0 };
 
     // Check if we need a new batch (only breaks on shader change)
     if (!current_shader.has_value() || shader_key != current_shader.value()) {

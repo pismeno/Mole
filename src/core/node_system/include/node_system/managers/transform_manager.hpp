@@ -11,7 +11,9 @@
 #include <glm/vec2.hpp>
 #include <nlohmann/json.hpp>
 
+#include "node_system/inode_resolver.hpp"
 #include "node_system/node_types.hpp"
+#include "utils/creflector.hpp"
 #include "utils/result.hpp"
 
 namespace mole {
@@ -19,7 +21,7 @@ namespace mole {
 using TransformIndex = uint32_t;
 inline constexpr TransformIndex invalid_transform_index = (std::numeric_limits<uint32_t>::max)();
 
-class TransformManager : public NodeManagerBase<TransformManager> {
+class TransformManager : public NodeManager<TransformManager> {
  public:
   explicit TransformManager();
 
@@ -55,9 +57,22 @@ class TransformManager : public NodeManagerBase<TransformManager> {
   void on_node_require_manager(NodeID node_id) noexcept override;
   void on_node_reparented(NodeID node_id, NodeID new_parent_id, NodeID old_parent_id) noexcept override;
   void on_scene_clear() noexcept override;
-  Result<void> on_serialize_scene(nlohmann::json& json) const override;
-  Result<void> on_deserialize_scene(const nlohmann::json& json) override;
 
+  template<CReflector TReflector>
+  void reflect(NodeID node_id, TReflector& re, INodeResolver& node_resolver) {
+    TransformInfo* transform = get_transform(node_id.index());
+    if (!transform) return;
+  
+    serialize(re, "position", transform->local_position);
+    serialize(re, "scale", transform->local_scale);
+    serialize(re, "shear", transform->local_shear);
+    serialize(re, "rotation", transform->local_rotation);
+  
+    if constexpr (TReflector::is_writing()) {
+      transform->is_dirty = true;
+      mark_spatial_children_dirty(node_id);
+    }
+  }
  private:
   /**
    * @brief private information for nodes

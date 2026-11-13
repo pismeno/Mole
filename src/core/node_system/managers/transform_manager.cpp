@@ -150,11 +150,8 @@ void TransformManager::update_node_hierarchy(NodeID node_id, const glm::mat3& pa
     float shx = transform->local_shear.x;
     float shy = transform->local_shear.y;
 
-    glm::mat3 local_mat(
-        sx * (cos - sin * shy), sx * (sin + cos * shy), 0.0f,
-        sy * (cos * shx - sin), sy * (sin * shx + cos), 0.0f,
-        transform->local_position.x, transform->local_position.y, 1.0f
-    );
+    glm::mat3 local_mat(sx * (cos - sin * shy), sx * (sin + cos * shy), 0.0f, sy * (cos * shx - sin),
+                        sy * (sin * shx + cos), 0.0f, transform->local_position.x, transform->local_position.y, 1.0f);
 
     my_global_mat = parent_global_mat * local_mat;
 
@@ -313,7 +310,7 @@ NodeID TransformManager::find_nearest_spatial_parent(NodeID node_id) const noexc
 }
 
 void TransformManager::relink_spatial_children_to_new_parent(NodeID logical_root, NodeID new_spatial_parent) noexcept {
-  std::vector<uint32_t> search_stack = { logical_root.index() };
+  std::vector<uint32_t> search_stack = {logical_root.index()};
 
   while (!search_stack.empty()) {
     uint32_t current_idx = search_stack.back();
@@ -343,9 +340,8 @@ void TransformManager::on_node_reparented(NodeID node_id, NodeID new_parent_id, 
   detach_from_old_logical_parent(node_id, old_parent_id);
   attach_to_new_logical_parent(node_id, new_parent_id);
 
-  logical_node_parents[node_id.index()] = (new_parent_id != NodeID::INVALID)
-                                          ? new_parent_id.index()
-                                          : NodeID::INVALID.index();
+  logical_node_parents[node_id.index()] =
+      (new_parent_id != NodeID::INVALID) ? new_parent_id.index() : NodeID::INVALID.index();
 
   // Next, we walk UP the logical tree to figure out what spatial transform we actually belong to
   NodeID nearest_spatial_parent = find_nearest_spatial_parent(node_id);
@@ -371,100 +367,4 @@ void TransformManager::on_scene_clear() noexcept {
   }
 }
 
-Result<void> TransformManager::on_serialize_scene(nlohmann::json& json) const {
-  json["nodes"] = nlohmann::json::array();
-
-  for (const auto& transform : transforms) {
-    // Fixed: Should be == to skip INVALID nodes. If it was != it would skip valid nodes!
-    if (transform.node_idx == NodeID::INVALID.index()) {
-      continue;
-    }
-
-    nlohmann::json transform_json;
-
-    transform_json["id"] = transform.node_idx;
-
-    transform_json["local_position"]["x"] = transform.local_position.x;
-    transform_json["local_position"]["y"] = transform.local_position.y;
-
-    transform_json["local_scale"]["x"] = transform.local_scale.x;
-    transform_json["local_scale"]["y"] = transform.local_scale.y;
-
-    transform_json["local_shear"]["x"] = transform.local_shear.x;
-    transform_json["local_shear"]["y"] = transform.local_shear.y;
-
-    transform_json["local_rotation"] = transform.local_rotation;
-
-    transform_json["parent_id"] = transform.parent_idx;
-
-    transform_json["first_child_id"] = transform.first_child_idx;
-
-    transform_json["next_sibling_id"] = transform.next_sibling_idx;
-
-    json["nodes"].push_back(transform_json);
-  }
-
-  return mole::ok();
-}
-
-Result<void> TransformManager::on_deserialize_scene(const nlohmann::json& json) {
-  if (!json.contains("nodes") || !json["nodes"].is_array()) {
-    return mole::ok();
-  }
-
-  for (const auto& node_json : json["nodes"]) {
-    if (!node_json.contains("id") || !node_json["id"].is_number_integer()) {
-      continue;
-    }
-
-    uint32_t node_idx = node_json["id"].get<uint32_t>();
-
-    // Bounds check to ensure we don't exceed MAX_ACTIVE_NODES
-    if (node_idx >= node_to_transform.size()) {
-      continue;
-    }
-
-    // Try to get the transform. If the Scene hasn't allocated it yet, force allocation.
-    TransformInfo* transform = get_transform(node_idx);
-    if (!transform) {
-      on_node_require_manager(NodeID::from(node_idx, 0));
-      transform = get_transform(node_idx);
-
-      // If it's STILL null, something is deeply wrong with memory, skip to be safe
-      if (!transform) continue;
-    }
-
-    // Extract Position
-    if (node_json.contains("local_position")) {
-      transform->local_position.x = node_json["local_position"].value("x", 0.0f);
-      transform->local_position.y = node_json["local_position"].value("y", 0.0f);
-    }
-
-    // Extract Scale
-    if (node_json.contains("local_scale")) {
-      transform->local_scale.x = node_json["local_scale"].value("x", 1.0f);
-      transform->local_scale.y = node_json["local_scale"].value("y", 1.0f);
-    }
-
-    // Extract Shear
-    if (node_json.contains("local_shear")) {
-      transform->local_shear.x = node_json["local_shear"].value("x", 0.0f);
-      transform->local_shear.y = node_json["local_shear"].value("y", 0.0f);
-    }
-
-    // Extract Rotation
-    transform->local_rotation = node_json.value("local_rotation", 0.0f);
-
-    // Extract Hierarchy Links (safely falling back to INVALID if missing)
-    transform->parent_idx       = node_json.value("parent_id", NodeID::INVALID.index());
-    transform->first_child_idx  = node_json.value("first_child_id", NodeID::INVALID.index());
-    transform->next_sibling_idx = node_json.value("next_sibling_id", NodeID::INVALID.index());
-
-    // CRITICAL: Force the engine to rebuild this node's global matrix on the next update
-    transform->is_dirty = true;
-  }
-
-  return mole::ok();
-}
-
-} // mole
+} // namespace mole

@@ -7,13 +7,14 @@
 
 namespace mole {
 
-template <typename T> class AssetPool;
+template <typename T>
+class AssetPool;
 
 template <typename T>
 class AssetHandle {
   friend class AssetPool<T>;
 
- public:
+public:
   AssetHandle() = default;
   ~AssetHandle();
 
@@ -40,9 +41,11 @@ class AssetHandle {
   [[nodiscard]] inline uint32_t get_generation() const noexcept { return generation; }
 
   [[nodiscard]] UUID get_uuid() const noexcept;
+  operator UUID() const noexcept { return get_uuid(); }
+  
   [[nodiscard]] uint32_t get_version() const noexcept;
 
- private:
+private:
   AssetHandle(AssetPool<T>* pool, uint32_t index, uint32_t generation) noexcept;
 
   void add_ref();
@@ -53,4 +56,4 @@ class AssetHandle {
   uint32_t generation = 0;
 };
 
-} // namespace mole
+} // mole

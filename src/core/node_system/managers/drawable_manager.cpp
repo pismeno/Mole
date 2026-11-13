@@ -1,74 +1,39 @@
 #include "node_system/managers/drawable_manager.hpp"
 
 #include <cstdint>
+#include <vector>
 
 #include <glm/vec2.hpp>
 #include <nlohmann/json.hpp>
 
+#include "node_system/node_system_context.hpp"
 #include "node_system/node_types.hpp"
 #include "resources/material_types.hpp"
+#include "resources/resources_context.hpp"
 #include "utils/result.hpp"
 
 namespace mole {
 
-DrawableManager::DrawableManager() {
+DrawableManager::DrawableManager(const NodeSystemContext& context)
+    : material_pool(context.resources_context->material_pool), asset_manager(context.resources_context->asset_manager) {
   drawables.resize(MAX_ACTIVE_NODES, Drawable{});
 }
 
-void DrawableManager::on_node_destroyed(NodeID node_id) noexcept {
-  drawables[node_id.index()].is_visible = false;
-}
+void DrawableManager::on_node_destroyed(NodeID node_id) noexcept { drawables[node_id.index()].is_visible = false; }
 
 void DrawableManager::on_node_require_manager(NodeID node_id) noexcept {
-  drawables[node_id.index()].is_visible = true;
+  drawables[node_id.index()] = Drawable{
+      .is_visible = true,
+      .size = {1.0f, 1.0f},
+      .material_id = MaterialID::INVALID,
+      .z_index = 0,
+  };
 }
 
 void DrawableManager::on_scene_clear() noexcept {
-  for (auto &drawable: drawables) {
+  for (Drawable& drawable : drawables) {
     drawable.is_visible = false;
   }
-}
-
-Result<void> DrawableManager::on_serialize_scene(nlohmann::json &json) const {
-  json["nodes"] = nlohmann::json::array();
-
-  uint32_t node_idx = 0;
-
-  for (node_idx = 0; node_idx < drawables.size(); ++node_idx) {
-    if (!drawables[node_idx].is_visible) {
-      continue;
-    }
-
-    nlohmann::json drawable_json;
-
-    drawable_json["id"] = node_idx;
-    drawable_json["z_index"] = drawables[node_idx].z_index;
-
-    json["nodes"].push_back(drawable_json);
-  }
-
-  return mole::ok();
-}
-
-Result<void> DrawableManager::on_deserialize_scene(const nlohmann::json &json) {
-  if (!json.contains("nodes") || !json["nodes"].is_array()) {
-    return mole::ok();
-  }
-
-  for (const auto& node_json : json["nodes"]) {
-    if (!node_json.contains("id") || !node_json["id"].is_number_integer()) {
-      continue;
-    }
-
-    uint32_t node_idx = node_json["id"].get<uint32_t>();
-    drawables[node_idx].is_visible = true;
-
-    if (node_json.contains("z_index") && node_json["z_index"].is_number_integer()) {
-      drawables[node_idx].z_index = node_json["z_index"].get<uint32_t>();
-    }
-  }
-
-  return mole::ok();
 }
 
 Result<void> DrawableManager::set_node_visible(NodeID node_id, bool visible) {

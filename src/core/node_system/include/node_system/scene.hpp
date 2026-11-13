@@ -13,18 +13,23 @@
 #include <nlohmann/json.hpp>
 
 #include "node_system/inode_manager.hpp"
+#include "node_system/inode_resolver.hpp"
 #include "node_system/node.hpp"
 #include "node_system/node_types.hpp"
+#include "resources/asset_handle.hpp"
+#include "resources/asset_types.hpp"
 #include "utils/result.hpp"
 #include "utils/string_hash.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
 
-class Scene {
+class SceneFactory;
 
-  friend class NodeHandle;
+class Scene : public INodeResolver {
+  friend class SceneFactory;
 
- public:
+public:
   explicit Scene(std::string scene_type_name);
   ~Scene();
 
@@ -34,7 +39,11 @@ class Scene {
   const NodeID get_nodes_parent(const NodeID node_id) const noexcept;
   std::vector<NodeID> get_nodes_children(const NodeID node_id) const noexcept;
 
+  Result<UUID> get_uuid(NodeID node_id) const override;
+  NodeID get_node_by_uuid(const UUID uuid) const override;
+
   [[nodiscard]] NodeID create_node(NodeID parent_id, std::string_view node_type);
+  [[nodiscard]] NodeID create_node(NodeID parent_id, std::string_view node_type, UUID uuid);
   void destroy_node(NodeID node_id);
   void reparent_node(NodeID node_id, NodeID new_parent_id);
 
@@ -48,9 +57,6 @@ class Scene {
 
   void clear_nodes();
 
-  Result<void> serialize(nlohmann::json& json) const;
-  Result<void> deserialize(const nlohmann::json& json);
-
   void add_manager(std::unique_ptr<INodeManager> manager);
   void add_node_type(std::string_view node_type, std::span<const std::string> node_managers);
 
@@ -61,16 +67,22 @@ class Scene {
     return static_cast<T*>(get_manager_by_name(T::TYPE_ID));
   }
 
- private:
+  void set_source_asset(AssetHandle<SceneAsset> asset);
+  [[nodiscard]] AssetHandle<SceneAsset> get_source_asset() const;
+
+private:
   std::string scene_type_name;
 
   [[nodiscard]] NodeID generate_id();
 
-  std::atomic<uint32_t> next_unused_id {0};
+  std::atomic<uint32_t> next_unused_id{0};
   std::vector<uint32_t> recycled_ids;
   std::vector<uint32_t> generations; // Index = the raw array slot, Value = the current active generation
   std::vector<Node> nodes;
   std::vector<std::string> node_types;
+
+  std::vector<UUID> node_uuids;
+  std::unordered_map<UUID, NodeID> uuid_to_node_id;
 
   std::unordered_map<std::string, std::unique_ptr<INodeManager>, StringHash, std::equal_to<>> managers_map;
   std::vector<INodeManager*> managers_flat_array;
@@ -80,6 +92,8 @@ class Scene {
   };
 
   std::unordered_map<std::string, NodeDefinition, StringHash, std::equal_to<>> node_type_definitions;
+
+  AssetHandle<SceneAsset> source_scene_asset;
 };
 
 } // mole

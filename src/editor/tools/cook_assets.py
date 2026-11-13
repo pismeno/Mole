@@ -42,7 +42,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-cook_funcs: dict[AssetType, Callable[[Path], bytes]] = {
+cook_funcs: dict[AssetType, Callable[[Path, BinaryIO], None]] = {
     AssetType.IMAGE : cooking.stream_file,
     AssetType.TEXT : cooking.stream_file,
     AssetType.GENERIC_BINARY : cooking.stream_file,
@@ -52,6 +52,8 @@ cook_funcs: dict[AssetType, Callable[[Path], bytes]] = {
     AssetType.GEOMETRY_SHADER : cooking.compile_glsl_to_spirv,
     AssetType.TESS_CONTROL_SHADER : cooking.compile_glsl_to_spirv,
     AssetType.TESS_EVALUATION_SHADER : cooking.compile_glsl_to_spirv,
+    AssetType.SCENE : cooking.stream_file,
+    AssetType.MATERIAL : cooking.stream_file,
 }
 
 for file_path_str in args.files:

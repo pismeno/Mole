@@ -13,22 +13,21 @@ namespace mole::inputs {
 /**
  * @brief Class for handling GLFW inputs
  */
-class GlfwInputs : public Inputs {
-
+class GlfwInputs : public IInputs {
   friend class ::mole::GlfwWindow;
 
- public:
+public:
   explicit GlfwInputs() = default;
 
   // Keyboard
-  bool is_key_pressed(KeyCode key) noexcept override;    // True ONLY on the exact frame it was pressed
-  bool is_key_held(KeyCode key) noexcept override;       // True as long as the key is down
-  bool is_key_released(KeyCode key) noexcept override;   // True ONLY on the exact frame it was let go
+  bool is_key_pressed(EKeyCode key) noexcept override;  // True ONLY on the exact frame it was pressed
+  bool is_key_held(EKeyCode key) noexcept override;     // True as long as the key is down
+  bool is_key_released(EKeyCode key) noexcept override; // True ONLY on the exact frame it was let go
 
   // Mouse
-  bool is_mouse_button_pressed(MouseCode button) noexcept override;
-  bool is_mouse_button_held(MouseCode button) noexcept override;
-  bool is_mouse_button_released(MouseCode button) noexcept override;
+  bool is_mouse_button_pressed(EMouseCode button) noexcept override;
+  bool is_mouse_button_held(EMouseCode button) noexcept override;
+  bool is_mouse_button_released(EMouseCode button) noexcept override;
   glm::vec2 get_mouse_position() noexcept override;
   float get_mouse_x() noexcept override;
   float get_mouse_y() noexcept override;
@@ -42,7 +41,7 @@ class GlfwInputs : public Inputs {
 
   void end_frame() noexcept override;
 
- private:
+private:
   static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
   static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
   static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos);
@@ -76,4 +75,4 @@ class GlfwInputs : public Inputs {
   inline void endFrameMouse() noexcept;
 };
 
-} // mole::inputs
+} // namespace mole::inputs

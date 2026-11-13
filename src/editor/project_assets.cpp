@@ -38,7 +38,7 @@ Result<nlohmann::json> ProjectAssets::read_meta_json(const std::string& asset_pa
   return json;
 }
 
-Result<UUID> ProjectAssets::resolve(std::string_view path, AssetType requested_type) const {
+Result<UUID> ProjectAssets::resolve(std::string_view path, EAssetType requested_type) const {
   std::string asset_path = std::string("project://assets/").append(path);
   auto r_is_file = file_system->is_file(asset_path);
 

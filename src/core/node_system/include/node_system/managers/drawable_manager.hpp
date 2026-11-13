@@ -9,9 +9,15 @@
 #include <glm/vec2.hpp>
 #include <nlohmann/json.hpp>
 
+#include "node_system/inode_resolver.hpp"
 #include "node_system/node_types.hpp"
+#include "resources/asset_manager.hpp"
+#include "resources/asset_types.hpp"
+#include "resources/material_pool.hpp"
 #include "resources/material_types.hpp"
+#include "utils/creflector.hpp"
 #include "utils/result.hpp"
+#include "utils/uuid.hpp"
 
 namespace mole {
 
@@ -23,13 +29,17 @@ struct Drawable {
   uint32_t z_index = 0;
 };
 
-class DrawableManager : public NodeManagerBase<DrawableManager> {
- public:
-  explicit DrawableManager();
+struct NodeSystemContext;
+
+class DrawableManager : public NodeManager<DrawableManager> {
+public:
+  explicit DrawableManager(const NodeSystemContext& context);
 
   static constexpr const char* TYPE_ID = "drawable_manager";
 
-  [[nodiscard]] inline bool has_drawable(NodeID node_id) const noexcept { return drawables[node_id.index()].is_visible; }
+  [[nodiscard]] inline bool has_drawable(NodeID node_id) const noexcept {
+    return drawables[node_id.index()].is_visible;
+  }
 
   /**
    * Gets the draw information of the given node.
@@ -52,11 +62,48 @@ class DrawableManager : public NodeManagerBase<DrawableManager> {
   void on_node_destroyed(NodeID node_id) noexcept override;
   void on_node_require_manager(NodeID node_id) noexcept override;
   void on_scene_clear() noexcept override;
-  Result<void> on_serialize_scene(nlohmann::json& json) const override;
-  Result<void> on_deserialize_scene(const nlohmann::json& json) override;
 
- private:
+  template <CReflector TReflector>
+  void reflect(NodeID node_id, TReflector& re, INodeResolver& node_resolver) {
+    if (node_id.index() >= drawables.size()) return;
+    Drawable& drawable = drawables[node_id.index()];
+
+    serialize(re, "visible", drawable.is_visible);
+    serialize(re, "size", drawable.size);
+    serialize(re, "z_index", drawable.z_index);
+
+    if constexpr (TReflector::is_writing()) {
+      UUID mat_uuid{};
+      if (drawable.material_id != MaterialID::INVALID) {
+        auto r_uuid = material_pool->get_uuid(drawable.material_id);
+        if (r_uuid) {
+          mat_uuid = r_uuid.value();
+        }
+      }
+      serialize(re, "material_uuid", mat_uuid);
+    } else {
+      UUID mat_uuid{};
+      serialize(re, "material_uuid", mat_uuid);
+      if (mat_uuid.is_nil()) {
+        serialize(re, "material_id", mat_uuid);
+      }
+      if (!mat_uuid.is_nil()) {
+        auto r_mat_asset = asset_manager->acquire<MaterialAsset>(mat_uuid);
+        if (r_mat_asset) {
+          auto r_mat_id = material_pool->add(r_mat_asset.value());
+          if (r_mat_id) {
+            drawable.material_id = r_mat_id.value();
+          }
+        }
+      }
+    }
+  }
+
+private:
   std::vector<Drawable> drawables;
+
+  MaterialPool* material_pool;
+  AssetManager* asset_manager;
 };
 
-} // mole
+} // namespace mole

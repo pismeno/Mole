@@ -9,7 +9,7 @@
 namespace mole {
 
 namespace inputs {
-class Inputs;
+class IInputs;
 }
 
 struct WindowOptions {
@@ -21,7 +21,7 @@ struct WindowOptions {
 };
 
 class IWindow {
- public:
+public:
   explicit IWindow() = default;
   virtual ~IWindow() noexcept = default;
 
@@ -53,7 +53,7 @@ class IWindow {
   /**
    * @return Inputs object, responsible for handling input events.
    */
-  virtual inputs::Inputs& get_inputs() = 0;
+  virtual inputs::IInputs& get_inputs() = 0;
 
   /**
    * @return OS specific handle to the window.
@@ -64,8 +64,9 @@ class IWindow {
    * @brief Factory method to create the specific implementation.
    */
   static Result<std::unique_ptr<IWindow>> create(const WindowOptions& options);
- private:
+
+private:
   virtual Result<void> init() = 0;
 };
 
-} // mole
+} // namespace mole

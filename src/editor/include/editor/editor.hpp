@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "node_system/engine_managers.hpp"
+#include "node_system/manager_reflector_binder_factory.hpp"
 #include "editor/editor_context.hpp"
 #include "node_system/node_system_context.hpp"
 #include "node_system/node_types.hpp"
@@ -60,13 +62,11 @@ class Editor {
   std::unique_ptr<SceneFactory> scene_factory;
   std::unique_ptr<RenderGatherer> render_gatherer;
   std::unique_ptr<ProcessOrchestrator> process_orchestrator;
+  std::unique_ptr<ManagerReflectorBinderFactory<EngineManagers>> manager_reflector_binder_factory;
 
   std::unique_ptr<IWindow> window;
   std::unique_ptr<Scene> scene;
   std::unique_ptr<IEditorState> state;
-
-  // Cache these to interact with the active scene
-  NodeID root_node; // Using default 0 assuming NodeID maps to an int internally, adjust type if it's a strongly typed class
 };
 
 } // mole

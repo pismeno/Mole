@@ -19,6 +19,7 @@ Scene::Scene(std::string scene_type_name) : scene_type_name(std::move(scene_type
   nodes.resize(MAX_ACTIVE_NODES);
   generations.resize(MAX_ACTIVE_NODES);
   node_types.resize(MAX_ACTIVE_NODES);
+  node_uuids.resize(MAX_ACTIVE_NODES);
 }
 
 Scene::~Scene() = default;
@@ -69,11 +70,45 @@ INodeManager* Scene::get_manager_by_name(std::string_view type_id) const {
   return nodes[node_id.index()].children_ids;
 }
 
-[[nodiscard]] NodeID Scene::create_node(NodeID parent_id, std::string_view node_type) {
-  NodeID new_id = generate_id();
+Result<UUID> Scene::get_uuid(NodeID node_id) const {
+  if (!is_node_valid(node_id)) {
+    return mole::fail("Node ID is not valid");
+  }
 
-  nodes[new_id.index()].id = new_id;
-  nodes[new_id.index()].parent_id = NodeID::INVALID;
+  return node_uuids[node_id.index()];
+}
+
+NodeID Scene::get_node_by_uuid(const UUID uuid) const {
+  auto it = uuid_to_node_id.find(uuid);
+  if (it != uuid_to_node_id.end()) {
+    if (is_node_valid(it->second)) {
+      return it->second;
+    }
+  }
+
+  return NodeID::INVALID;
+}
+
+[[nodiscard]] NodeID Scene::create_node(NodeID parent_id, std::string_view node_type) {
+  return create_node(parent_id, node_type, UUID::generate_v4());
+}
+
+[[nodiscard]] NodeID Scene::create_node(NodeID parent_id, std::string_view node_type, UUID uuid) {
+  if (uuid.is_nil() || uuid_to_node_id.contains(uuid)) {
+    return NodeID::INVALID;
+  }
+
+  NodeID new_id = generate_id();
+  if (new_id == NodeID::INVALID) {
+    return NodeID::INVALID;
+  }
+
+  const uint32_t index = new_id.index();
+  nodes[index].id = new_id;
+  nodes[index].parent_id = NodeID::INVALID;
+  node_types[index] = node_type;
+  node_uuids[index] = uuid;
+  uuid_to_node_id[uuid] = new_id;
 
   for (auto& manager : managers_flat_array) {
     manager->on_node_created(new_id);
@@ -89,8 +124,6 @@ INodeManager* Scene::get_manager_by_name(std::string_view type_id) const {
   if (parent_id != NodeID::INVALID && parent_id != new_id) {
     reparent_node(new_id, parent_id);
   }
-
-  node_types[new_id.index()] = node_type;
 
   return new_id;
 }
@@ -130,6 +163,9 @@ void Scene::destroy_node(NodeID node_id) {
   node->id = NodeID::INVALID;
   node->parent_id = NodeID::INVALID;
   node->children_ids.clear();
+
+  UUID dead_uuid = node_uuids[node_id.index()];
+  uuid_to_node_id.erase(dead_uuid);
 }
 
 void Scene::clear_nodes() {
@@ -169,22 +205,22 @@ void Scene::reparent_node(NodeID node_id, NodeID new_parent_id) {
     return;
   }
 
-  Node *child = &nodes[node_id.index()];
-  Node *new_parent = &nodes[new_parent_id.index()];
+  Node* child = &nodes[node_id.index()];
+  Node* new_parent = &nodes[new_parent_id.index()];
 
   if (!child) {
-    std::cerr <<"Node with provided ID not found";
+    std::cerr << "Node with provided ID not found";
     return;
   }
 
   if (!new_parent) {
-    std::cerr <<"Parent node with provided ID not found";
+    std::cerr << "Parent node with provided ID not found";
     return;
   }
 
   NodeID old_parent_id = child->parent_id;
   if (child->parent_id != NodeID::INVALID) {
-    Node *old_parent = &nodes[child->parent_id.index()];
+    Node* old_parent = &nodes[child->parent_id.index()];
     if (old_parent) {
       auto& siblings = old_parent->children_ids;
       siblings.erase(std::remove(siblings.begin(), siblings.end(), node_id), siblings.end());
@@ -233,7 +269,8 @@ void Scene::add_node_type(std::string_view node_type, std::span<const std::strin
   for (auto& manager_name : node_managers) {
     auto manager_it = managers_map.find(manager_name);
     if (manager_it == managers_map.end()) {
-      std::cerr << "Node type '" << std::string(node_type) << "' requires manager '" << std::string(manager_name) << "' which is not registered";
+      std::cerr << "Node type '" << std::string(node_type) << "' requires manager '" << std::string(manager_name)
+                << "' which is not registered";
       return;
     }
 
@@ -242,5 +279,9 @@ void Scene::add_node_type(std::string_view node_type, std::span<const std::strin
 
   node_type_definitions.emplace(node_type, std::move(node_definition));
 }
+
+void Scene::set_source_asset(AssetHandle<SceneAsset> asset) { source_scene_asset = std::move(asset); }
+
+AssetHandle<SceneAsset> Scene::get_source_asset() const { return source_scene_asset; }
 
 } // mole

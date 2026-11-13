@@ -5,7 +5,6 @@
 #include <nlohmann/json.hpp>
 
 #include "node_system/node_types.hpp"
-#include "utils/result.hpp"
 
 namespace mole {
 
@@ -56,25 +55,13 @@ class INodeManager {
    * @brief Called when the scene is cleared (when Scene::clear() is called).
    */
   virtual void on_scene_clear() noexcept {};
-
-  /**
-   * @brief Called when the scene is being serialized.
-   * @param json Json object assigned to this manager to serialize the manager's data into.
-   */
-  virtual Result<void> on_serialize_scene(nlohmann::json& json) const { return mole::ok(); };
-
-  /**
-   * @brief Called when the scene is being deserialized.
-   * @param json This manager's data to deserialize from.
-   */
-  virtual Result<void> on_deserialize_scene(const nlohmann::json& json) { return mole::ok(); };
 };
 
-template <typename Derived>
-class NodeManagerBase : public INodeManager {
+template <typename TDerived>
+class NodeManager : public INodeManager {
  public:
   std::string get_name() const noexcept override {
-    return std::string(Derived::TYPE_ID);
+    return std::string(TDerived::TYPE_ID);
   }
 };
 

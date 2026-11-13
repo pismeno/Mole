@@ -12,14 +12,10 @@ namespace mole {
 
 struct RenderingContext;
 
-enum class RendererType {
-  Metal,
-  Vulkan,
-  DirectX
-};
+enum class ERendererType { Metal, Vulkan, DirectX };
 
 struct RendererOptions {
-  RendererType type;
+  ERendererType type;
   void* native_window_handle;
   uint32_t window_width, window_height;
 };

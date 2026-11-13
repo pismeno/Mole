@@ -17,8 +17,7 @@
 
 namespace mole {
 
-FileWatcher::FileWatcher(std::filesystem::path watch_path)
-    : watch_path(std::move(watch_path)) {}
+FileWatcher::FileWatcher(std::filesystem::path watch_path) : watch_path(std::move(watch_path)) {}
 
 Result<std::unique_ptr<FileWatcher>> FileWatcher::create(std::string_view watch_path, const EditorContext& context) {
   auto r_resolve_path = context.os_context->file_system->resolve(watch_path);
@@ -34,13 +33,11 @@ void FileWatcher::start() {
   watcher = std::make_unique<wtr::watch>(watch_path, [this](wtr::event const& event) {
     if (event.path_type == wtr::event::path_type::file) {
       if (event.effect_type == wtr::event::effect_type::modify) {
-        push_event(event.path_name, FileWatchEventType::Modified);
-      }
-      else if (event.effect_type == wtr::event::effect_type::create) {
-        push_event(event.path_name, FileWatchEventType::Created);
-      }
-      else if (event.effect_type == wtr::event::effect_type::destroy) {
-        push_event(event.path_name, FileWatchEventType::Deleted);
+        push_event(event.path_name, EFileWatchEventType::Modified);
+      } else if (event.effect_type == wtr::event::effect_type::create) {
+        push_event(event.path_name, EFileWatchEventType::Created);
+      } else if (event.effect_type == wtr::event::effect_type::destroy) {
+        push_event(event.path_name, EFileWatchEventType::Deleted);
       }
     }
   });
@@ -64,13 +61,13 @@ std::vector<FileWatchEvent> FileWatcher::poll_events() {
   return events_to_process;
 }
 
-void FileWatcher::push_event(std::filesystem::path path, FileWatchEventType type) {
+void FileWatcher::push_event(std::filesystem::path path, EFileWatchEventType type) {
   std::lock_guard<std::mutex> lock(mutex);
 
   auto it = pending_events.find(path);
   if (it != pending_events.end()) {
     // Preserve Created status if follow-up modification arrives in the same burst
-    if (it->second.type == FileWatchEventType::Created && type == FileWatchEventType::Modified) {
+    if (it->second.type == EFileWatchEventType::Created && type == EFileWatchEventType::Modified) {
       it->second.last_event_time = std::chrono::steady_clock::now();
       return;
     }
@@ -80,4 +77,4 @@ void FileWatcher::push_event(std::filesystem::path path, FileWatchEventType type
   }
 }
 
-} // mole
+} // namespace mole

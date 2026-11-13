@@ -3,11 +3,16 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
+
+#include "resources/asset_handle.hpp"
+#include "resources/material.hpp"
+#include "utils/string_hash.hpp"
 
 namespace mole {
 
-enum class AssetType : uint32_t {
+enum class EAssetType : uint32_t {
   Unkown = 0,
   Text = 1,
   GenericBinary = 2,
@@ -18,13 +23,15 @@ enum class AssetType : uint32_t {
   TessControlShader = 7,
   TessEvaluationShader = 8,
   Image = 9,
+  Scene = 10,
+  Material = 11,
 };
 
 struct AssetHeader {
-  char magic[4];           // "MOLE"
+  char magic[4]; // "MOLE"
   uint32_t version;
-  AssetType asset_type;    // Enum backing type is uint32_t
-  uint32_t payload_size;   // Size of the actual cooked data
+  EAssetType asset_type; // Enum backing type is uint32_t
+  uint32_t payload_size; // Size of the actual cooked data
 };
 
 constexpr std::string_view ASSET_MAGIC = "MOLE";
@@ -39,7 +46,7 @@ struct Asset {
 };
 
 struct ImageAsset : Asset {
-  static constexpr const AssetType ASSET_TYPE = AssetType::Image;
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::Image;
 
   uint32_t width = 0;
   uint32_t height = 0;
@@ -56,7 +63,7 @@ struct ImageAsset : Asset {
  * @brief Base class for all binary assets.
  */
 struct BinaryAsset : Asset {
-  static constexpr const AssetType ASSET_TYPE = AssetType::GenericBinary;
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::GenericBinary;
 
   std::vector<uint8_t> data;
 
@@ -69,7 +76,7 @@ struct BinaryAsset : Asset {
  * @brief Base class for all text assets.
  */
 struct TextAsset : BinaryAsset {
-  static constexpr const AssetType ASSET_TYPE = AssetType::Text;
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::Text;
 
   [[nodiscard]] std::string_view as_string_view() const noexcept;
   [[nodiscard]] std::string as_string() const;
@@ -85,29 +92,59 @@ struct ShaderAsset : BinaryAsset {
 };
 
 struct VertexShaderAsset : ShaderAsset {
-  static constexpr const AssetType ASSET_TYPE = AssetType::VertexShader;
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::VertexShader;
   static const VertexShaderAsset FALLBACK;
 };
 
 struct FragmentShaderAsset : ShaderAsset {
-  static constexpr const AssetType ASSET_TYPE = AssetType::FragmentShader;
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::FragmentShader;
   static const FragmentShaderAsset FALLBACK;
 };
 
 struct ComputeShaderAsset : ShaderAsset {
-  static constexpr const AssetType ASSET_TYPE = AssetType::ComputeShader;
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::ComputeShader;
 };
 
 struct GeometryShaderAsset : ShaderAsset {
-  static constexpr const AssetType ASSET_TYPE = AssetType::GeometryShader;
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::GeometryShader;
 };
 
 struct TessControlShaderAsset : ShaderAsset {
-  static constexpr const AssetType ASSET_TYPE = AssetType::TessControlShader;
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::TessControlShader;
 };
 
 struct TessEvaluationShaderAsset : ShaderAsset {
-  static constexpr const AssetType ASSET_TYPE = AssetType::TessEvaluationShader;
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::TessEvaluationShader;
+};
+
+/**
+ * @brief Scene asset containing serialized scene payload.
+ */
+struct SceneAsset : Asset {
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::Scene;
+
+  std::vector<uint8_t> payload;
+
+  [[nodiscard]] const inline size_t get_size_bytes() const noexcept { return payload.size(); }
+  [[nodiscard]] std::string_view as_string_view() const noexcept {
+    if (payload.empty()) return {};
+    return std::string_view(reinterpret_cast<const char*>(payload.data()), payload.size());
+  }
+
+  static const SceneAsset FALLBACK;
+};
+
+/**
+ * @brief Material asset containing shader handles and property definitions.
+ */
+struct MaterialAsset : Asset {
+  static constexpr const EAssetType ASSET_TYPE = EAssetType::Material;
+
+  AssetHandle<VertexShaderAsset> vertex_shader;
+  AssetHandle<FragmentShaderAsset> fragment_shader;
+  std::unordered_map<std::string, MaterialProperty, StringHash, std::equal_to<>> properties;
+
+  static const MaterialAsset FALLBACK;
 };
 
 } // mole

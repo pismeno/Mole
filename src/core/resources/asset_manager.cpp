@@ -35,7 +35,7 @@ void AssetManager::unload(UUID uuid) {
   }
 }
 
-void AssetManager::unload(UUID uuid, AssetType type) {
+void AssetManager::unload(UUID uuid, EAssetType type) {
   auto it = asset_pools.find(type);
   if (it != asset_pools.end()) {
     it->second->mark_missing(uuid);
@@ -51,7 +51,7 @@ Result<void> AssetManager::reload(UUID uuid) {
   return mole::fail("Asset is not loaded in any active pool");
 }
 
-Result<void> AssetManager::reload(UUID uuid, AssetType type) {
+Result<void> AssetManager::reload(UUID uuid, EAssetType type) {
   auto it = asset_pools.find(type);
   if (it == asset_pools.end()) {
     return mole::fail("No pool found for asset type");
@@ -68,7 +68,7 @@ uint32_t AssetManager::get_version(UUID uuid) {
   return 0;
 }
 
-uint32_t AssetManager::get_version(UUID uuid, AssetType type) {
+uint32_t AssetManager::get_version(UUID uuid, EAssetType type) {
   auto it = asset_pools.find(type);
   if (it != asset_pools.end()) {
     return it->second->get_version(uuid);
@@ -101,4 +101,4 @@ Result<AssetHeader> AssetManager::read_asset_header(const std::string_view virtu
   return header;
 }
 
-} // mole
+} // namespace mole

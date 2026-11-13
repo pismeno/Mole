@@ -52,6 +52,13 @@ struct UUID { // Implemented using Gemini AI
     return std::string(buf);
   }
 
+  [[nodiscard]] bool is_nil() const noexcept {
+    for (uint8_t b : data) {
+      if (b != 0) return false;
+    }
+    return true;
+  }
+
   static UUID from_string(const std::string& str) {
     UUID id;
 
@@ -64,7 +71,7 @@ struct UUID { // Implemented using Gemini AI
     // Reading directly into uint8_t using %x causes memory corruption.
     unsigned int bytes[16];
 
-    int matched = sscanf(str.c_str(),
+    int matched = sscanf_s(str.c_str(),
                          "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
                          &bytes[0], &bytes[1], &bytes[2], &bytes[3],
                          &bytes[4], &bytes[5],

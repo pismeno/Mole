@@ -6,11 +6,13 @@
 #include <memory>
 #include <vector>
 
+#include "resources/material_pool.hpp"
 #include "utils/result.hpp"
 
 namespace mole {
 
 struct EditorContext;
+class MaterialPool;
 class AssetManager;
 class FileWatcher;
 class IFileSystem;
@@ -31,7 +33,7 @@ public:
   static Result<std::unique_ptr<WorkspaceState>> create(std::unique_ptr<Project> project, const EditorContext& context);
 
 private:
-  explicit WorkspaceState(std::unique_ptr<Project> project);
+  explicit WorkspaceState(const EditorContext& context);
 
   std::vector<std::unique_ptr<Subprocess>> active_processes;
 
@@ -41,6 +43,7 @@ private:
 
   IFileSystem* file_system;
   AssetManager* asset_manager;
+  MaterialPool* material_pool;
   ProcessOrchestrator* process_orchestrator;
 };
 

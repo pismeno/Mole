@@ -7,7 +7,7 @@ namespace mole::inputs {
 // ==========================================
 // MOUSE BUTTONS
 // ==========================================
-enum class MouseCode : uint16_t {
+enum class EMouseCode : uint16_t {
   Button0 = 0,
   Button1 = 1,
   Button2 = 2,
@@ -18,8 +18,8 @@ enum class MouseCode : uint16_t {
   Button7 = 7,
 
   // Aliases for standard buttons
-  Left   = Button0,
-  Right  = Button1,
+  Left = Button0,
+  Right = Button1,
   Middle = Button2,
   Thumb1 = Button3, // Mouse Back
   Thumb2 = Button4  // Mouse Forward
@@ -28,114 +28,172 @@ enum class MouseCode : uint16_t {
 // ==========================================
 // GAMEPAD BUTTONS (Standard XInput Layout)
 // ==========================================
-enum class GamepadCode : uint16_t {
+enum class EGamepadCode : uint16_t {
   // Face Buttons
-  A = 0,      // Cross on PS
-  B = 1,      // Circle on PS
-  X = 2,      // Square on PS
-  Y = 3,      // Triangle on PS
+  A = 0, // Cross on PS
+  B = 1, // Circle on PS
+  X = 2, // Square on PS
+  Y = 3, // Triangle on PS
 
   // Bumpers / Triggers (Digital)
-  LeftBumper  = 4,  // L1
+  LeftBumper = 4,   // L1
   RightBumper = 5,  // R1
   LeftTrigger = 6,  // L2 (If treated as a button)
-  RightTrigger= 7,  // R2 (If treated as a button)
+  RightTrigger = 7, // R2 (If treated as a button)
 
   // System / Menu
-  Back  = 8,        // Select / View / Share
-  Start = 9,        // Menu / Options
-  Guide = 10,       // Xbox Button / PS Button
+  Back = 8,   // Select / View / Share
+  Start = 9,  // Menu / Options
+  Guide = 10, // Xbox Button / PS Button
 
   // Thumbstick Clicks
-  LeftThumb  = 11,  // L3
-  RightThumb = 12,  // R3
+  LeftThumb = 11,  // L3
+  RightThumb = 12, // R3
 
   // D-Pad
-  DPadUp    = 13,
+  DPadUp = 13,
   DPadRight = 14,
-  DPadDown  = 15,
-  DPadLeft  = 16
+  DPadDown = 15,
+  DPadLeft = 16
 };
 
 // ==========================================
 // KEYBOARD KEYS
 // ==========================================
-enum class KeyCode : uint16_t {
+enum class EKeyCode : uint16_t {
   Unknown = 0,
 
   // Printable keys
-  Space         = 32,
-  Apostrophe    = 39,  // '
-  Comma         = 44,  // ,
-  Minus         = 45,  // -
-  Period        = 46,  // .
-  Slash         = 47,  // /
+  Space = 32,
+  Apostrophe = 39, // '
+  Comma = 44,      // ,
+  Minus = 45,      // -
+  Period = 46,     // .
+  Slash = 47,      // /
 
   // Numbers
-  D0 = 48, D1 = 49, D2 = 50, D3 = 51, D4 = 52,
-  D5 = 53, D6 = 54, D7 = 55, D8 = 56, D9 = 57,
+  D0 = 48,
+  D1 = 49,
+  D2 = 50,
+  D3 = 51,
+  D4 = 52,
+  D5 = 53,
+  D6 = 54,
+  D7 = 55,
+  D8 = 56,
+  D9 = 57,
 
-  Semicolon     = 59,  // ;
-  Equal         = 61,  // =
+  Semicolon = 59, // ;
+  Equal = 61,     // =
 
   // Letters
-  A = 65, B = 66, C = 67, D = 68, E = 69, F = 70, G = 71,
-  H = 72, I = 73, J = 74, K = 75, L = 76, M = 77, N = 78,
-  O = 79, P = 80, Q = 81, R = 82, S = 83, T = 84, U = 85,
-  V = 86, W = 87, X = 88, Y = 89, Z = 90,
+  A = 65,
+  B = 66,
+  C = 67,
+  D = 68,
+  E = 69,
+  F = 70,
+  G = 71,
+  H = 72,
+  I = 73,
+  J = 74,
+  K = 75,
+  L = 76,
+  M = 77,
+  N = 78,
+  O = 79,
+  P = 80,
+  Q = 81,
+  R = 82,
+  S = 83,
+  T = 84,
+  U = 85,
+  V = 86,
+  W = 87,
+  X = 88,
+  Y = 89,
+  Z = 90,
 
-  LeftBracket   = 91,  // [
-  Backslash     = 92,  // '\'
-  RightBracket  = 93,  // ]
-  GraveAccent   = 96,  // ` (Tilde)
+  LeftBracket = 91,  // [
+  Backslash = 92,    // '\'
+  RightBracket = 93, // ]
+  GraveAccent = 96,  // ` (Tilde)
 
   // Function keys
-  Escape        = 256,
-  Enter         = 257,
-  Tab           = 258,
-  Backspace     = 259,
-  Insert        = 260,
-  Delete        = 261,
-  Right         = 262,
-  Left          = 263,
-  Down          = 264,
-  Up            = 265,
-  PageUp        = 266,
-  PageDown      = 267,
-  Home          = 268,
-  End           = 269,
-  CapsLock      = 280,
-  ScrollLock    = 281,
-  NumLock       = 282,
-  PrintScreen   = 283,
-  Pause         = 284,
+  Escape = 256,
+  Enter = 257,
+  Tab = 258,
+  Backspace = 259,
+  Insert = 260,
+  Delete = 261,
+  Right = 262,
+  Left = 263,
+  Down = 264,
+  Up = 265,
+  PageUp = 266,
+  PageDown = 267,
+  Home = 268,
+  End = 269,
+  CapsLock = 280,
+  ScrollLock = 281,
+  NumLock = 282,
+  PrintScreen = 283,
+  Pause = 284,
 
-  F1 = 290, F2 = 291, F3 = 292, F4 = 293, F5 = 294, F6 = 295,
-  F7 = 296, F8 = 297, F9 = 298, F10 = 299, F11 = 300, F12 = 301,
-  F13 = 302, F14 = 303, F15 = 304, F16 = 305, F17 = 306, F18 = 307,
-  F19 = 308, F20 = 309, F21 = 310, F22 = 311, F23 = 312, F24 = 313,
+  F1 = 290,
+  F2 = 291,
+  F3 = 292,
+  F4 = 293,
+  F5 = 294,
+  F6 = 295,
+  F7 = 296,
+  F8 = 297,
+  F9 = 298,
+  F10 = 299,
+  F11 = 300,
+  F12 = 301,
+  F13 = 302,
+  F14 = 303,
+  F15 = 304,
+  F16 = 305,
+  F17 = 306,
+  F18 = 307,
+  F19 = 308,
+  F20 = 309,
+  F21 = 310,
+  F22 = 311,
+  F23 = 312,
+  F24 = 313,
 
   // Numpad
-  KP0 = 320, KP1 = 321, KP2 = 322, KP3 = 323, KP4 = 324,
-  KP5 = 325, KP6 = 326, KP7 = 327, KP8 = 328, KP9 = 329,
-  KPDecimal     = 330,
-  KPDivide      = 331,
-  KPMultiply    = 332,
-  KPSubtract    = 333,
-  KPAdd         = 334,
-  KPEnter       = 335,
-  KPEqual       = 336,
+  KP0 = 320,
+  KP1 = 321,
+  KP2 = 322,
+  KP3 = 323,
+  KP4 = 324,
+  KP5 = 325,
+  KP6 = 326,
+  KP7 = 327,
+  KP8 = 328,
+  KP9 = 329,
+  KPDecimal = 330,
+  KPDivide = 331,
+  KPMultiply = 332,
+  KPSubtract = 333,
+  KPAdd = 334,
+  KPEnter = 335,
+  KPEqual = 336,
 
   // Modifiers
-  LeftShift     = 340,
-  LeftControl   = 341,
-  LeftAlt       = 342,
-  LeftSuper     = 343, // Windows Key / Command Key
-  RightShift    = 344,
-  RightControl  = 345,
-  RightAlt      = 346,
-  RightSuper    = 347, // Windows Key / Command Key
-  Menu          = 348  // Context Menu Key
+  LeftShift = 340,
+  LeftControl = 341,
+  LeftAlt = 342,
+  LeftSuper = 343, // Windows Key / Command Key
+  RightShift = 344,
+  RightControl = 345,
+  RightAlt = 346,
+  RightSuper = 347, // Windows Key / Command Key
+  Menu = 348        // Context Menu Key
 };
 
-} // mole::inputs
+} // namespace mole::inputs

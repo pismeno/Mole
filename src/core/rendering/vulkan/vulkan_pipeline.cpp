@@ -27,8 +27,8 @@ Result<std::unique_ptr<VulkanPipeline>> VulkanPipeline::create(const VulkanPipel
   return std::move(pipeline);
 }
 
-template <std::derived_from<ShaderAsset> A>
-Result<std::unique_ptr<vk::raii::ShaderModule>> load_shader_module(const AssetHandle<A>& shader_handle, VulkanContext& vk_context) {
+template <std::derived_from<ShaderAsset> TShader>
+Result<std::unique_ptr<vk::raii::ShaderModule>> load_shader_module(const AssetHandle<TShader>& shader_handle, VulkanContext& vk_context) {
   vk::ShaderModuleCreateInfo create_info{
       .codeSize = shader_handle->data.size(),      // Size in bytes
       .pCode    = shader_handle->as_32bit_words()  // Pointer to aligned uint32_t data

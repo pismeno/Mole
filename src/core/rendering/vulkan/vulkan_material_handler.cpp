@@ -112,8 +112,7 @@ Result<void> VulkanMaterialHandler::create_descriptor_pool() {
   std::array<vk::DescriptorPoolSize, 2> pool_sizes = {
       vk::DescriptorPoolSize{.type = vk::DescriptorType::eCombinedImageSampler,
                              .descriptorCount = vk_context.get_texture_capacity()},
-      vk::DescriptorPoolSize{.type = vk::DescriptorType::eStorageBuffer, // <--- Add this!
-                             .descriptorCount = 1}};
+      vk::DescriptorPoolSize{.type = vk::DescriptorType::eStorageBuffer, .descriptorCount = 1}};
 
   vk::DescriptorPoolCreateInfo create_info{.flags = vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind |
                                                     vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
@@ -434,10 +433,12 @@ Result<void> VulkanMaterialHandler::prepare_materials(std::vector<MaterialID> ma
     } else {
       GpuMaterial& gpu_material = it->second;
       gpu_material.last_used_on_frame = frames_rendered.count;
-      const Material& material = material_pool->get(material_id);
-      uint32_t version = material_pool->get_version(material_id);
-      uint32_t vert_version = material.vertex_shader.get_version();
-      uint32_t frag_version = material.fragment_shader.get_version();
+      auto r_version = material_pool->get_version(material_id);
+      uint32_t version = r_version ? r_version.value() : 0;
+      auto r_vert = material_pool->get_vertex_shader(material_id);
+      auto r_frag = material_pool->get_fragment_shader(material_id);
+      uint32_t vert_version = r_vert ? r_vert.value().get_version() : 0;
+      uint32_t frag_version = r_frag ? r_frag.value().get_version() : 0;
       if (gpu_material.version != version || gpu_material.vert_shader_version != vert_version ||
           gpu_material.frag_shader_version != frag_version) {
         to_update.push_back(material_id);
@@ -466,14 +467,16 @@ Result<void> VulkanMaterialHandler::upload_material(const MaterialID& material_i
 
   // Increase texture references
   std::vector<uint64_t> texture_ids;
-  const Material& material = material_pool->get(material_id);
-  for (auto& [name, property] : material.properties) {
-    if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
-      uint64_t tex_id = texture->get_packed_id();
-      add_texture_reference(tex_id);
-      texture_ids.push_back(tex_id);
+  auto r_with = material_pool->with_material(material_id, [&](const Material& material) {
+    for (auto& [name, property] : material.properties) {
+      if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
+        uint64_t tex_id = texture->get_packed_id();
+        add_texture_reference(tex_id);
+        texture_ids.push_back(tex_id);
+      }
     }
-  }
+  });
+  if (!r_with) return mole::fail(r_with.error());
 
   auto r_packed = packed_material_cache->get(material_id);
   if (!r_packed) return mole::fail(r_packed.error());
@@ -490,13 +493,17 @@ Result<void> VulkanMaterialHandler::upload_material(const MaterialID& material_i
   uint32_t shader_index =
       (slot_index * static_cast<uint32_t>(MATERIAL_STRIDE)) / static_cast<uint32_t>(packed_material.data.size());
 
+  auto r_version = material_pool->get_version(material_id);
+  auto r_vert = material_pool->get_vertex_shader(material_id);
+  auto r_frag = material_pool->get_fragment_shader(material_id);
+
   // Store slot, shader index, frame count, version, and texture references in the map!
   allocated_materials[material_id] = {.slot_index = slot_index,
                                       .shader_index = shader_index,
                                       .last_used_on_frame = frames_rendered.count,
-                                      .version = material_pool->get_version(material_id),
-                                      .vert_shader_version = material.vertex_shader.get_version(),
-                                      .frag_shader_version = material.fragment_shader.get_version(),
+                                      .version = r_version ? r_version.value() : 0,
+                                      .vert_shader_version = r_vert ? r_vert.value().get_version() : 0,
+                                      .frag_shader_version = r_frag ? r_frag.value().get_version() : 0,
                                       .texture_ids = std::move(texture_ids)};
 
   std::byte* target_address = gpu_dest + (slot_index * MATERIAL_STRIDE);
@@ -517,12 +524,14 @@ Result<void> VulkanMaterialHandler::update_material(const MaterialID& material_i
   uint32_t slot_index = gpu_material.slot_index;
 
   std::vector<uint64_t> new_texture_ids;
-  const Material& material = material_pool->get(material_id);
-  for (auto& [name, property] : material.properties) {
-    if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
-      new_texture_ids.push_back(texture->get_packed_id());
+  auto r_with = material_pool->with_material(material_id, [&](const Material& material) {
+    for (auto& [name, property] : material.properties) {
+      if (auto texture = std::get_if<AssetHandle<ImageAsset>>(&property)) {
+        new_texture_ids.push_back(texture->get_packed_id());
+      }
     }
-  }
+  });
+  if (!r_with) return mole::fail(r_with.error());
 
   for (uint64_t tex_id : new_texture_ids) {
     add_texture_reference(tex_id);
@@ -548,11 +557,15 @@ Result<void> VulkanMaterialHandler::update_material(const MaterialID& material_i
   uint32_t shader_index =
       (slot_index * static_cast<uint32_t>(MATERIAL_STRIDE)) / static_cast<uint32_t>(packed_material.data.size());
 
+  auto r_version = material_pool->get_version(material_id);
+  auto r_vert = material_pool->get_vertex_shader(material_id);
+  auto r_frag = material_pool->get_fragment_shader(material_id);
+
   gpu_material.shader_index = shader_index;
   gpu_material.last_used_on_frame = frames_rendered.count;
-  gpu_material.version = material_pool->get_version(material_id);
-  gpu_material.vert_shader_version = material.vertex_shader.get_version();
-  gpu_material.frag_shader_version = material.fragment_shader.get_version();
+  gpu_material.version = r_version ? r_version.value() : 0;
+  gpu_material.vert_shader_version = r_vert ? r_vert.value().get_version() : 0;
+  gpu_material.frag_shader_version = r_frag ? r_frag.value().get_version() : 0;
 
   std::byte* target_address = gpu_dest + (slot_index * MATERIAL_STRIDE);
   std::memset(target_address, 0, MATERIAL_STRIDE);
