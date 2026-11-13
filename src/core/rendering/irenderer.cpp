@@ -16,16 +16,17 @@ namespace mole {
 
 Result<std::unique_ptr<IRenderer>> IRenderer::create(RendererOptions options, RenderingContext& context) {
   switch (options.type) {
-    case RendererType::Metal: {
+    case ERendererType::Metal: {
 #ifdef MOLE_PLATFORM_APPLE
       return std::make_unique<MetalRenderer>();
 #else
       return mole::fail("Metal renderer is only supported on macOS");
 #endif
     }
-    case RendererType::Vulkan: {
+    case ERendererType::Vulkan: {
 #ifdef MOLE_PLATFORM_WINDOWS
-      auto r_vulkan = VulkanRenderer::create(context, options.native_window_handle, options.window_width, options.window_height);
+      auto r_vulkan =
+          VulkanRenderer::create(context, options.native_window_handle, options.window_width, options.window_height);
       if (!r_vulkan) return mole::fail(r_vulkan.error());
 
       return std::unique_ptr<IRenderer>(std::move(r_vulkan).value());
@@ -33,7 +34,7 @@ Result<std::unique_ptr<IRenderer>> IRenderer::create(RendererOptions options, Re
       return mole::fail("Vulkan renderer is only supported on Windows");
 #endif
     }
-    case RendererType::DirectX: {
+    case ERendererType::DirectX: {
       return mole::fail("DirectX renderer is not yet implemented");
     }
     default: {
@@ -42,4 +43,4 @@ Result<std::unique_ptr<IRenderer>> IRenderer::create(RendererOptions options, Re
   }
 }
 
-} // mole
+} // namespace mole

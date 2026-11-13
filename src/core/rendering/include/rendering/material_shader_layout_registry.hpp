@@ -23,9 +23,9 @@ public:
   Result<MaterialShaderLayout> get(uint64_t shader_id, uint32_t shader_version, const uint32_t* spirv_words,
                                    size_t size_bytes);
 
-  template <typename A>
-    requires(std::derived_from<A, ShaderAsset>)
-  Result<MaterialShaderLayout> get(const AssetHandle<A>& shader) {
+  template <typename TShader>
+    requires(std::derived_from<TShader, ShaderAsset>)
+  Result<MaterialShaderLayout> get(const AssetHandle<TShader>& shader) {
     return get(shader.get_packed_id(), shader.get_version(), shader->as_32bit_words(), shader->get_size_bytes());
   }
 

@@ -42,5 +42,8 @@ Thumbs.db
 *.swo
 *~
 
+# AI
+AGENTS.md
+
 # Mole
 test_project/

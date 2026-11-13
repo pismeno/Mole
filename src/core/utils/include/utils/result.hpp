@@ -25,9 +25,9 @@ class [[nodiscard]] Result {
 
   Result(mole::Failure failure) : data(std::in_place_index<1>, std::move(failure.message)) {}
 
-  template <typename U>
-  requires std::convertible_to<U, T> && (!std::same_as<std::decay_t<U>, Result<T>>)
-  Result(U&& value) : data(std::in_place_index<0>, T(std::forward<U>(value))) {}
+  template <typename TU>
+  requires std::convertible_to<TU, T> && (!std::same_as<std::decay_t<TU>, Result<T>>)
+  Result(TU&& value) : data(std::in_place_index<0>, T(std::forward<TU>(value))) {}
 
   Result(Result&& other) noexcept = default;
   Result& operator=(Result&& other) noexcept = default;
@@ -66,19 +66,19 @@ class [[nodiscard]] Result {
   /**
     * @brief Returns the contained value if successful, otherwise returns default_value.
     */
-  template <typename U>
-  requires std::copy_constructible<T> && std::convertible_to<U&&, T>
-  [[nodiscard]] constexpr T value_or(U&& default_value) const & {
-    return is_ok() ? std::get<0>(data) : static_cast<T>(std::forward<U>(default_value));
+  template <typename TU>
+  requires std::copy_constructible<T> && std::convertible_to<TU&&, T>
+  [[nodiscard]] constexpr T value_or(TU&& default_value) const & {
+    return is_ok() ? std::get<0>(data) : static_cast<T>(std::forward<TU>(default_value));
   }
 
   /**
     * @brief Moves the contained value if successful, otherwise returns default_value.
     */
-  template <typename U>
-  requires std::move_constructible<T> && std::convertible_to<U&&, T>
-  [[nodiscard]] constexpr T value_or(U&& default_value) && {
-    return is_ok() ? std::get<0>(std::move(data)) : static_cast<T>(std::forward<U>(default_value));
+  template <typename TU>
+  requires std::move_constructible<T> && std::convertible_to<TU&&, T>
+  [[nodiscard]] constexpr T value_or(TU&& default_value) && {
+    return is_ok() ? std::get<0>(std::move(data)) : static_cast<T>(std::forward<TU>(default_value));
   }
 
  private:

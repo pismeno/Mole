@@ -120,7 +120,7 @@ bool GlfwWindow::is_minimized() const noexcept {
   return glfwGetWindowAttrib(glfw_window, GLFW_ICONIFIED) != 0 || framebuffer_width == 0 || framebuffer_height == 0;
 }
 
-inputs::Inputs& GlfwWindow::get_inputs() {
+inputs::IInputs& GlfwWindow::get_inputs() {
   return inputs;
 }
 

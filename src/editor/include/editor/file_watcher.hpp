@@ -16,33 +16,29 @@ namespace mole {
 
 struct EditorContext;
 
-enum class FileWatchEventType {
-  Created,
-  Modified,
-  Deleted
-};
+enum class EFileWatchEventType { Created, Modified, Deleted };
 
 struct FileWatchEvent {
   std::filesystem::path path;
-  FileWatchEventType type;
+  EFileWatchEventType type;
 };
 
 class FileWatcher {
- public:
+public:
   ~FileWatcher() = default;
 
   std::vector<FileWatchEvent> poll_events();
 
   static Result<std::unique_ptr<FileWatcher>> create(std::string_view watch_path, const EditorContext& editor_context);
 
- private:
+private:
   explicit FileWatcher(std::filesystem::path watch_path);
 
   void start();
-  void push_event(std::filesystem::path path, FileWatchEventType type);
+  void push_event(std::filesystem::path path, EFileWatchEventType type);
 
   struct PendingEvent {
-    FileWatchEventType type;
+    EFileWatchEventType type;
     std::chrono::steady_clock::time_point last_event_time;
   };
 
@@ -54,4 +50,4 @@ class FileWatcher {
   static constexpr std::chrono::milliseconds debounce_delay{100};
 };
 
-} // mole
+} // namespace mole

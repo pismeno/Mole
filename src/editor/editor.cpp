@@ -137,7 +137,7 @@ Result<void> Editor::init() {
     .process_orchestrator = process_orchestrator.get(),
   };
 
-  RendererOptions renderer_options{RendererType::Vulkan, window->get_native_handle(), window->get_framebuffer_width(),
+  RendererOptions renderer_options{ERendererType::Vulkan, window->get_native_handle(), window->get_framebuffer_width(),
                                    window->get_framebuffer_height()};
 
   auto renderer_result = IRenderer::create(renderer_options, rendering_context);
@@ -169,13 +169,13 @@ Result<void> Editor::load_workspace() {
   WorkspaceState* workspace_state = r_create_state.value().get();
   state = std::move(r_create_state).value();
 
-  auto r_res_uuid = workspace_state->get_project_assets().resolve("scene_definitions.json", AssetType::Text);
+  auto r_res_uuid = workspace_state->get_project_assets().resolve("scene_definitions.json", EAssetType::Text);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
   auto r_get_scene_defs = asset_manager->acquire<TextAsset>(r_res_uuid.value());
   if (!r_get_scene_defs) return mole::fail(r_get_scene_defs.error());
   AssetHandle<TextAsset> scene_defs = std::move(r_get_scene_defs).value();
 
-  r_res_uuid = workspace_state->get_project_assets().resolve("node_definitions.json", AssetType::Text);
+  r_res_uuid = workspace_state->get_project_assets().resolve("node_definitions.json", EAssetType::Text);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
   auto r_get_node_defs = asset_manager->acquire<TextAsset>(r_res_uuid.value());
   if (!r_get_node_defs) return mole::fail(r_get_node_defs.error());
@@ -186,32 +186,32 @@ Result<void> Editor::load_workspace() {
   auto r_load_node_defs = scene_factory->load_node_definitions_from(node_defs->as_string_view());
   if (!r_load_node_defs) return mole::fail(r_load_node_defs.error());
 
-  r_res_uuid = workspace_state->get_project_assets().resolve("test_img.png", AssetType::Image);
+  r_res_uuid = workspace_state->get_project_assets().resolve("test_img.png", EAssetType::Image);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
   auto r_get_texture = asset_manager->acquire<ImageAsset>(r_res_uuid.value());
   if (!r_get_texture) return mole::fail(r_get_texture.error());
   AssetHandle<ImageAsset> texture = std::move(r_get_texture).value();
   std::cout << bindless_texture_registry->get_index(texture) << " - Tex index" << std::endl;
 
-  r_res_uuid = workspace_state->get_project_assets().resolve("mat_a.vert.glsl", AssetType::VertexShader);
+  r_res_uuid = workspace_state->get_project_assets().resolve("mat_a.vert.glsl", EAssetType::VertexShader);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
   auto r_get_vert_shader_a = asset_manager->acquire<VertexShaderAsset>(r_res_uuid.value());
   if (!r_get_vert_shader_a) return mole::fail(r_get_vert_shader_a.error());
   AssetHandle<VertexShaderAsset> vert_shader_a = std::move(r_get_vert_shader_a).value();
 
-  r_res_uuid = workspace_state->get_project_assets().resolve("mat_a.frag.glsl", AssetType::FragmentShader);
+  r_res_uuid = workspace_state->get_project_assets().resolve("mat_a.frag.glsl", EAssetType::FragmentShader);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
   auto r_get_frag_shader_a = asset_manager->acquire<FragmentShaderAsset>(r_res_uuid.value());
   if (!r_get_frag_shader_a) return mole::fail(r_get_frag_shader_a.error());
   AssetHandle<FragmentShaderAsset> frag_shader_a = std::move(r_get_frag_shader_a).value();
 
-  r_res_uuid = workspace_state->get_project_assets().resolve("mat_b.vert.glsl", AssetType::VertexShader);
+  r_res_uuid = workspace_state->get_project_assets().resolve("mat_b.vert.glsl", EAssetType::VertexShader);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
   auto r_get_vert_shader_b = asset_manager->acquire<VertexShaderAsset>(r_res_uuid.value());
   if (!r_get_vert_shader_b) return mole::fail(r_get_vert_shader_b.error());
   AssetHandle<VertexShaderAsset> vert_shader_b = std::move(r_get_vert_shader_b).value();
 
-  r_res_uuid = workspace_state->get_project_assets().resolve("mat_b.frag.glsl", AssetType::FragmentShader);
+  r_res_uuid = workspace_state->get_project_assets().resolve("mat_b.frag.glsl", EAssetType::FragmentShader);
   if (!r_res_uuid) return mole::fail(r_res_uuid.error());
   auto r_get_frag_shader_b = asset_manager->acquire<FragmentShaderAsset>(r_res_uuid.value());
   if (!r_get_frag_shader_b) return mole::fail(r_get_frag_shader_b.error());
@@ -303,13 +303,29 @@ Result<void> Editor::load_workspace() {
   auto r_z_3 = drawable_manager->set_node_z_index(child_node2, 2);
   if (!r_z_3) return r_z_3;
 
+  auto r_res_get_scene = workspace_state->get_project_assets().resolve("scene.json", EAssetType::Text);
+  if (!r_res_get_scene) return mole::fail(r_res_get_scene.error());
+  auto r_get_scene_asset = asset_manager->acquire<TextAsset>(r_res_get_scene.value());
+  if (!r_get_scene_asset) return mole::fail(r_get_scene_asset.error());
+  AssetHandle<TextAsset> scene_json_ass = std::move(r_get_scene_asset).value();
+  
+  nlohmann::json scene_json = nlohmann::json::parse(scene_json_ass->as_string_view());
+  JsonReadReflector reader(scene_json);
+  auto r_load = scene_factory->load_scene(reader);
+  if (!r_load) {
+    std::cerr << "failed to load scene: " << r_load.error() << std::endl;
+  } else {
+    scene = std::move(r_load).value();
+    std::cout << "loaded scene successfuly" << std::endl;
+  }
+  
   return mole::ok();
 }
 
 Result<void> Editor::run() {
   using namespace inputs;
 
-  Inputs& inputs = window->get_inputs();
+  inputs::IInputs& inputs = window->get_inputs();
   while (!window->should_close()) {
     mole::ViewData view_data{};
 
@@ -334,7 +350,7 @@ Result<void> Editor::run() {
       }
     }
 
-    if (inputs.is_key_pressed(KeyCode::J)) {
+    if (inputs.is_key_pressed(EKeyCode::J)) {
       if (scene) {
         nlohmann::json json;
         JsonWriteReflector writer(json);
@@ -346,11 +362,11 @@ Result<void> Editor::run() {
     if (state) {
       MaterialID test_mat_id2 = MaterialID::from(1, 0);
 
-      if (inputs.is_key_pressed(KeyCode::M)) {
+      if (inputs.is_key_pressed(EKeyCode::M)) {
         material_pool->set_property(test_mat_id2, "tint", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
       }
 
-      if (inputs.is_key_released(KeyCode::M)) {
+      if (inputs.is_key_released(EKeyCode::M)) {
         material_pool->set_property(test_mat_id2, "tint", glm::vec4(0.0f, 1.0f, 1.0f, 1.0f));
       }
 

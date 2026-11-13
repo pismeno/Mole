@@ -19,7 +19,7 @@ class IFileSystem;
 Result<std::vector<uint8_t>> read_asset_payload(IFileSystem* file_system, UUID uuid);
 
 class IAssetPool {
- public:
+public:
   virtual ~IAssetPool() = default;
 
   virtual void mark_missing(UUID uuid) = 0;
@@ -29,9 +29,9 @@ class IAssetPool {
   virtual uint32_t get_version(UUID uuid) const = 0;
 };
 
-template<typename T>
+template <typename T>
 class AssetPool : public IAssetPool {
- public:
+public:
   AssetPool(IFileSystem* file_system) : file_system(file_system) {}
 
   Result<AssetHandle<T>> load(UUID uuid) {
@@ -77,11 +77,11 @@ class AssetPool : public IAssetPool {
 
     auto r_asset = load_asset_from_file(uuid);
     if (!r_asset) {
-      assets[index].state = AssetState::MissingOnDisk;
+      assets[index].state = EAssetState::MissingOnDisk;
       return mole::fail(r_asset.error());
     }
     assets[index].asset = std::move(r_asset).value();
-    assets[index].state = AssetState::Loaded;
+    assets[index].state = EAssetState::Loaded;
     assets[index].version++;
     return mole::ok();
   }
@@ -104,7 +104,7 @@ class AssetPool : public IAssetPool {
     auto it = cache.find(uuid);
     if (it != cache.end()) {
       uint32_t index = it->second;
-      assets[index].state = AssetState::MissingOnDisk;
+      assets[index].state = EAssetState::MissingOnDisk;
       assets[index].asset = T{};
       assets[index].version++;
     }
@@ -113,7 +113,7 @@ class AssetPool : public IAssetPool {
   const T& resolve(uint32_t index, uint32_t generation) {
     if (index >= assets.size()) return fallback_asset;
     if (assets[index].generation != generation) return fallback_asset;
-    if (assets[index].state == AssetState::MissingOnDisk) return fallback_asset;
+    if (assets[index].state == EAssetState::MissingOnDisk) return fallback_asset;
     return assets[index].asset;
   }
 
@@ -133,27 +133,25 @@ class AssetPool : public IAssetPool {
       assets[index].asset = T{};
       assets[index].version = 0;
       assets[index].generation++;
-      assets[index].state = AssetState::Unloaded;
+      assets[index].state = EAssetState::Unloaded;
       free_indices.push_back(index);
     }
   }
 
-  bool contains(UUID uuid) const override {
-    return cache.contains(uuid);
-  }
+  bool contains(UUID uuid) const override { return cache.contains(uuid); }
 
   bool is_loaded(UUID uuid) const override {
     auto it = cache.find(uuid);
     if (it == cache.end()) return false;
 
     uint32_t index = it->second;
-    return assets[index].state == AssetState::Loaded;
+    return assets[index].state == EAssetState::Loaded;
   }
 
   bool is_loaded(uint32_t index, uint32_t generation) const {
     if (index >= assets.size()) return false;
     if (assets[index].generation != generation) return false;
-    return assets[index].state == AssetState::Loaded;
+    return assets[index].state == EAssetState::Loaded;
   }
 
   uint32_t get_version(UUID uuid) const override {
@@ -162,19 +160,15 @@ class AssetPool : public IAssetPool {
     return assets[it->second].version;
   }
 
-  UUID get_uuid(uint32_t index) const {
-    return uuids[index];
-  }
+  UUID get_uuid(uint32_t index) const { return uuids[index]; }
 
-  uint32_t get_version(uint32_t index) const {
-    return assets[index].version;
-  }
+  uint32_t get_version(uint32_t index) const { return assets[index].version; }
 
- protected:
+protected:
   Result<T> parse_asset(std::string_view filepath, std::vector<uint8_t> raw_bytes);
 
- private:
-  enum class AssetState {
+private:
+  enum class EAssetState {
     Loaded,
     MissingOnDisk,
     Unloaded,
@@ -185,7 +179,7 @@ class AssetPool : public IAssetPool {
     uint32_t generation = 1;
     uint32_t ref_count = 0;
     uint32_t version = 0;
-    AssetState state = AssetState::Loaded;
+    EAssetState state = EAssetState::Loaded;
   };
 
   std::vector<AssetSlot> assets;
@@ -198,7 +192,7 @@ class AssetPool : public IAssetPool {
   IFileSystem* file_system;
 };
 
-template<typename T>
+template <typename T>
 inline Result<T> AssetPool<T>::parse_asset(std::string_view filepath, std::vector<uint8_t> raw_bytes) {
   T asset;
   asset.data = std::move(raw_bytes);
@@ -208,4 +202,4 @@ inline Result<T> AssetPool<T>::parse_asset(std::string_view filepath, std::vecto
 template <>
 Result<ImageAsset> AssetPool<ImageAsset>::parse_asset(std::string_view filepath, std::vector<uint8_t> raw_bytes);
 
-} // mole
+} // namespace mole

@@ -39,7 +39,7 @@ TEST_CASE("AssetManager: acquire after unload uses pool without disk dependency"
   AssetHeader header{
       .magic = {'M', 'O', 'L', 'E'},
       .version = ASSET_CURRENT_VERSION,
-      .asset_type = AssetType::Text,
+      .asset_type = EAssetType::Text,
       .payload_size = static_cast<uint32_t>(payload.size())
   };
 

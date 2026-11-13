@@ -113,7 +113,7 @@ void WorkspaceState::update() {
     // 2. Pass just the relative path, since get_cooked_uuids is internally prepending the base assets path
     std::string path_for_uuids = rel_path.generic_string();
 
-    if (fw_event.type == FileWatchEventType::Deleted) {
+    if (fw_event.type == EFileWatchEventType::Deleted) {
       auto r_remove = project_assets->remove(path_for_uuids);
       if (!r_remove) {
         std::cerr << "Failed to remove asset " << path_for_uuids << ": " << r_remove.error() << std::endl;

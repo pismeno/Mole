@@ -2,6 +2,12 @@ BasedOnStyle: Google
 Language: Cpp
 Standard: Latest
 
+# Naming Conventions (prefixes):
+# - 'E' for enums like EColor::Red
+# - 'C' for concepts like CReflector
+# - 'I' for pure abstract classes/interfaces
+# - 'T' for typenames in templates like TReflector, just T is also acceptable
+
 # Indentation
 IndentWidth: 2
 TabWidth: 2

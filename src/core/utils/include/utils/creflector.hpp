@@ -31,8 +31,8 @@ concept CReflector = requires(T re, const char* name, int32_t& i32, uint32_t& u3
     { re.end_array() } -> std::same_as<void>;
 };
 
-template <CReflector R, typename T>
-inline void serialize(R& re, const char* name, T& value);
+template <CReflector TReflector, typename T>
+inline void serialize(TReflector& re, const char* name, T& value);
 
 
 inline void serialize_field(CReflector auto& re, const char* name, glm::vec2& v) {
@@ -59,9 +59,9 @@ inline void serialize_field(CReflector auto& re, const char* name, glm::vec4& v)
     re.end_object();
 }
 
-template <CReflector R>
-inline void serialize_field(R& re, const char* name, UUID& uuid) {
-    if constexpr (R::is_writing()) {
+template <CReflector TReflector>
+inline void serialize_field(TReflector& re, const char* name, UUID& uuid) {
+    if constexpr (TReflector::is_writing()) {
         std::string str = uuid.to_string();
         re.field(name, str);
     } else {
@@ -110,7 +110,7 @@ requires(T serializable, TReflector& reflector) {
 };
 
 // C++20 standard trick for static_assert inside constexpr blocks
-template<class> inline constexpr bool always_false_v = false;
+template<typename T> inline constexpr bool always_false_v = false;
 
 template <CReflector TReflector, typename T>
 inline void serialize(TReflector& re, const char* name, T& value) {

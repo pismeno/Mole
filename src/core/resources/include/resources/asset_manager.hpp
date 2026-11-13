@@ -22,10 +22,10 @@ struct ResourcesContext;
  * @brief Central manager for loading, caching, and retrieving assets via type-specific pools.
  */
 class AssetManager {
+  template <typename T>
+  friend class AssetHandle;
 
-  template <typename> friend class AssetHandle;
-
- public:
+public:
   template <std::derived_from<Asset> T>
   Result<AssetHandle<T>> acquire(UUID uuid) {
     auto* pool = get_pool<T>();
@@ -54,21 +54,21 @@ class AssetManager {
   }
 
   void unload(UUID uuid);
-  void unload(UUID uuid, AssetType type);
+  void unload(UUID uuid, EAssetType type);
   template <std::derived_from<Asset> T>
   void unload(UUID uuid) {
     unload(uuid, T::ASSET_TYPE);
   }
 
   Result<void> reload(UUID uuid);
-  Result<void> reload(UUID uuid, AssetType type);
+  Result<void> reload(UUID uuid, EAssetType type);
   template <std::derived_from<Asset> T>
   Result<void> reload(UUID uuid) {
     return reload(uuid, T::ASSET_TYPE);
   }
 
   uint32_t get_version(UUID uuid);
-  uint32_t get_version(UUID uuid, AssetType type);
+  uint32_t get_version(UUID uuid, EAssetType type);
   template <std::derived_from<Asset> T>
   uint32_t get_version(UUID uuid) {
     return get_version(uuid, T::ASSET_TYPE);
@@ -79,7 +79,7 @@ class AssetManager {
    */
   static Result<std::unique_ptr<AssetManager>> create(ResourcesContext& context);
 
- private:
+private:
   AssetManager() = default;
   Result<void> init(ResourcesContext& context);
 
@@ -99,9 +99,9 @@ class AssetManager {
 
   Result<AssetHeader> read_asset_header(std::string_view virtual_path);
 
-  std::unordered_map<AssetType, std::unique_ptr<IAssetPool>> asset_pools;
+  std::unordered_map<EAssetType, std::unique_ptr<IAssetPool>> asset_pools;
 
   IFileSystem* file_system = nullptr;
 };
 
-} // mole
+} // namespace mole
