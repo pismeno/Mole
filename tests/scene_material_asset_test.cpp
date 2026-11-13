@@ -198,7 +198,7 @@ TEST_CASE("AssetPool: SceneAsset and MaterialAsset parsing") {
   std::filesystem::remove_all(temp_dir);
 }
 
-TEST_CASE("MaterialPool: acquire_material and UUID lookup") {
+TEST_CASE("MaterialPool: add MaterialAsset and UUID lookup") {
   auto r_fs = IFileSystem::create();
   REQUIRE(r_fs.is_ok());
   auto fs = std::move(r_fs).value();
@@ -217,13 +217,13 @@ TEST_CASE("MaterialPool: acquire_material and UUID lookup") {
 
   MaterialPool pool(res_ctx);
 
-  SUBCASE("Acquire invalid handle returns INVALID") {
+  SUBCASE("Add invalid handle returns fail") {
     AssetHandle<MaterialAsset> invalid_handle;
-    MaterialID id = pool.acquire_material(invalid_handle);
-    CHECK(id == MaterialID::INVALID);
+    auto r_id = pool.add(invalid_handle);
+    CHECK_FALSE(r_id.is_ok());
   }
 
-  SUBCASE("Acquire valid MaterialAsset caches and returns same MaterialID") {
+  SUBCASE("Add valid MaterialAsset caches and returns same MaterialID") {
     UUID mat_uuid = UUID::generate_v4();
     nlohmann::json mat_json;
     mat_json["vertex_shader"] = UUID{}.to_string();
@@ -247,17 +247,25 @@ TEST_CASE("MaterialPool: acquire_material and UUID lookup") {
     REQUIRE(r_handle.is_ok());
     auto handle = std::move(r_handle).value();
 
-    MaterialID id1 = pool.acquire_material(handle);
+    auto r_id1 = pool.add(handle);
+    REQUIRE(r_id1.is_ok());
+    MaterialID id1 = r_id1.value();
     CHECK(id1 != MaterialID::INVALID);
     CHECK(pool.is_valid(id1));
 
     // Acquiring again with same asset handle must return exact same MaterialID
-    MaterialID id2 = pool.acquire_material(handle);
+    auto r_id2 = pool.add(handle);
+    REQUIRE(r_id2.is_ok());
+    MaterialID id2 = r_id2.value();
     CHECK(id1 == id2);
 
     // UUID lookup
-    CHECK(pool.get_uuid(id1) == mat_uuid);
-    CHECK(pool.get_id(mat_uuid.to_string()) == id1);
+    auto r_uuid = pool.get_uuid(id1);
+    REQUIRE(r_uuid.is_ok());
+    CHECK(r_uuid.value() == mat_uuid);
+    auto r_get_id = pool.get_id(mat_uuid);
+    REQUIRE(r_get_id.is_ok());
+    CHECK(r_get_id.value() == id1);
   }
 
   std::filesystem::remove_all(temp_dir);
@@ -273,14 +281,14 @@ TEST_CASE("MaterialPool: save_material and load_material roundtrip") {
   mat.properties["vec3_prop"] = glm::vec3(1.0f, 2.0f, 3.0f);
   mat.properties["vec4_prop"] = glm::vec4(1.0f, 2.0f, 3.0f, 4.0f);
 
-  UUID mat_uuid = UUID::generate_v4();
-  MaterialID id = pool_write.add("test_roundtrip", std::move(mat), mat_uuid);
+  MaterialID id = pool_write.add(std::move(mat));
   REQUIRE(pool_write.is_valid(id));
 
   // Serialize to JSON
   nlohmann::json json;
   JsonWriteReflector writer(json);
-  pool_write.save_material(writer, id);
+  auto r_save = pool_write.save_material(writer, id);
+  REQUIRE(r_save.is_ok());
 
   CHECK(json.contains("properties"));
   CHECK(json["properties"].is_array());
@@ -289,11 +297,14 @@ TEST_CASE("MaterialPool: save_material and load_material roundtrip") {
   // Deserialize into new MaterialPool
   MaterialPool pool_read(res_ctx);
   JsonReadReflector reader(json);
+  UUID mat_uuid = UUID::generate_v4();
   auto r_load = pool_read.load_material(reader, mat_uuid);
   REQUIRE(r_load.is_ok());
   MaterialID loaded_id = r_load.value();
   CHECK(pool_read.is_valid(loaded_id));
-  CHECK(pool_read.get_uuid(loaded_id) == mat_uuid);
+  auto r_uuid = pool_read.get_uuid(loaded_id);
+  REQUIRE(r_uuid.is_ok());
+  CHECK(r_uuid.value() == mat_uuid);
 }
 
 TEST_CASE("SceneFactory: instantiate_scene sets source_scene_asset") {
@@ -407,7 +418,22 @@ TEST_CASE("SceneFactory: instantiate_scene sets source_scene_asset") {
 }
 
 TEST_CASE("DrawableManager: reflect writes and reads material_uuid") {
-  ResourcesContext res_ctx;
+  auto r_fs = IFileSystem::create();
+  REQUIRE(r_fs.is_ok());
+  auto fs = std::move(r_fs).value();
+
+  std::filesystem::path temp_dir = std::filesystem::temp_directory_path() / "mole_dm_reflect_test";
+  std::filesystem::create_directories(temp_dir);
+  fs->mount("assets", temp_dir);
+
+  OSContext os_ctx{.file_system = fs.get()};
+  ResourcesContext res_ctx{.os_context = &os_ctx};
+
+  auto r_mgr = AssetManager::create(res_ctx);
+  REQUIRE(r_mgr.is_ok());
+  auto mgr = std::move(r_mgr).value();
+  res_ctx.asset_manager = mgr.get();
+
   MaterialPool pool(res_ctx);
   res_ctx.material_pool = &pool;
 
@@ -415,9 +441,29 @@ TEST_CASE("DrawableManager: reflect writes and reads material_uuid") {
       .resources_context = &res_ctx,
   };
 
-  Material mat;
   UUID mat_uuid = UUID::generate_v4();
-  MaterialID mat_id = pool.add("test_mat", std::move(mat), mat_uuid);
+  nlohmann::json mat_json;
+  mat_json["vertex_shader"] = UUID{}.to_string();
+  mat_json["fragment_shader"] = UUID{}.to_string();
+  mat_json["properties"] = nlohmann::json::array();
+  std::string mat_str = mat_json.dump();
+  AssetHeader mat_hdr{
+      .magic = {'M', 'O', 'L', 'E'},
+      .version = ASSET_CURRENT_VERSION,
+      .asset_type = EAssetType::Material,
+      .payload_size = static_cast<uint32_t>(mat_str.size()),
+  };
+  {
+    std::ofstream ofs(temp_dir / (mat_uuid.to_string() + ".asset"), std::ios::binary);
+    ofs.write(reinterpret_cast<const char*>(&mat_hdr), sizeof(mat_hdr));
+    ofs.write(mat_str.data(), mat_str.size());
+  }
+
+  auto r_handle = mgr->acquire<MaterialAsset>(mat_uuid);
+  REQUIRE(r_handle.is_ok());
+  auto r_mat_id = pool.add(r_handle.value());
+  REQUIRE(r_mat_id.is_ok());
+  MaterialID mat_id = r_mat_id.value();
 
   DrawableManager dm_write(node_ctx);
 
@@ -444,4 +490,164 @@ TEST_CASE("DrawableManager: reflect writes and reads material_uuid") {
   CHECK(json["material_uuid"] == mat_uuid.to_string());
   CHECK(json["visible"] == true);
   CHECK(json["z_index"] == 7);
+
+  std::filesystem::remove_all(temp_dir);
+}
+
+TEST_CASE("MaterialPool: source asset binding, live sync and hot reloading") {
+  auto r_fs = IFileSystem::create();
+  REQUIRE(r_fs.is_ok());
+  auto fs = std::move(r_fs).value();
+
+  std::filesystem::path temp_dir = std::filesystem::temp_directory_path() / "mole_mat_sync_test";
+  std::filesystem::create_directories(temp_dir);
+  fs->mount("assets", temp_dir);
+
+  OSContext os_ctx{.file_system = fs.get()};
+  ResourcesContext res_ctx{.os_context = &os_ctx};
+
+  auto r_mgr = AssetManager::create(res_ctx);
+  REQUIRE(r_mgr.is_ok());
+  auto mgr = std::move(r_mgr).value();
+  res_ctx.asset_manager = mgr.get();
+
+  MaterialPool pool(res_ctx);
+
+  auto write_material_file = [&](UUID uuid, float roughness_val) {
+    nlohmann::json mat_json;
+    mat_json["vertex_shader"] = UUID{}.to_string();
+    mat_json["fragment_shader"] = UUID{}.to_string();
+    mat_json["properties"] = nlohmann::json::array({
+        {{"name", "roughness"}, {"type", 0}, {"value", roughness_val}},
+    });
+    std::string mat_str = mat_json.dump();
+    AssetHeader mat_hdr{
+        .magic = {'M', 'O', 'L', 'E'},
+        .version = ASSET_CURRENT_VERSION,
+        .asset_type = EAssetType::Material,
+        .payload_size = static_cast<uint32_t>(mat_str.size()),
+    };
+    std::ofstream ofs(temp_dir / (uuid.to_string() + ".asset"), std::ios::binary);
+    ofs.write(reinterpret_cast<const char*>(&mat_hdr), sizeof(mat_hdr));
+    ofs.write(mat_str.data(), mat_str.size());
+  };
+
+  UUID mat_uuid = UUID::generate_v4();
+  write_material_file(mat_uuid, 0.5f);
+
+  auto r_handle = mgr->acquire<MaterialAsset>(mat_uuid);
+  REQUIRE(r_handle.is_ok());
+  auto handle = std::move(r_handle).value();
+
+  SUBCASE("acquire_material stores and returns valid source asset handle") {
+    auto r_id = pool.add(handle);
+    REQUIRE(r_id.is_ok());
+    MaterialID id = r_id.value();
+    CHECK(pool.is_valid(id));
+    auto r_src = pool.get_source_asset(id);
+    REQUIRE(r_src.is_ok());
+    CHECK(r_src.value() == handle);
+    CHECK(r_src.value().is_valid());
+    auto r_uuid = pool.get_uuid(id);
+    REQUIRE(r_uuid.is_ok());
+    CHECK(r_uuid.value() == mat_uuid);
+  }
+
+  SUBCASE("set_source_asset and get_source_asset binding and unlinking") {
+    Material mat;
+    MaterialID id = pool.add(std::move(mat));
+    CHECK(pool.is_valid(id));
+    auto r_src = pool.get_source_asset(id);
+    REQUIRE(r_src.is_ok());
+    CHECK_FALSE(r_src.value().is_valid());
+
+    // Bind source asset
+    auto r_bind = pool.set_source_asset(id, handle);
+    REQUIRE(r_bind.is_ok());
+    CHECK(pool.get_source_asset(id).value() == handle);
+    CHECK(pool.get_uuid(id).value() == mat_uuid);
+    CHECK(pool.get_id(mat_uuid).value() == id);
+    auto r_prop = pool.get_property(id, "roughness");
+    REQUIRE(r_prop.is_ok());
+    CHECK(std::get<float>(r_prop.value()) == 0.5f);
+
+    // Conflict check: another material cannot bind to the same UUID
+    MaterialID id2 = pool.add(Material{});
+    auto r_conflict = pool.set_source_asset(id2, handle);
+    CHECK_FALSE(r_conflict.is_ok());
+
+    // Unlink source asset
+    auto r_unlink = pool.set_source_asset(id, AssetHandle<MaterialAsset>{});
+    REQUIRE(r_unlink.is_ok());
+    CHECK_FALSE(pool.get_source_asset(id).value().is_valid());
+    CHECK(pool.get_uuid(id).value().is_nil());
+
+    // Now id2 can bind to handle
+    auto r_bind2 = pool.set_source_asset(id2, handle);
+    CHECK(r_bind2.is_ok());
+    CHECK(pool.get_source_asset(id2).value() == handle);
+  }
+
+  SUBCASE("Invalid material ID for set_source_asset and reload_from_source") {
+    CHECK_FALSE(pool.set_source_asset(MaterialID::INVALID, handle).is_ok());
+    CHECK_FALSE(pool.reload_from_source(MaterialID::INVALID).is_ok());
+    CHECK_FALSE(pool.get_source_asset(MaterialID::INVALID).is_ok());
+
+    MaterialID unlinked_id = pool.add(Material{});
+    CHECK_FALSE(pool.reload_from_source(unlinked_id).is_ok());
+  }
+
+  SUBCASE("Live sync on AssetManager::reload") {
+    auto r_id = pool.add(handle);
+    REQUIRE(r_id.is_ok());
+    MaterialID id = r_id.value();
+    CHECK(pool.is_valid(id));
+    auto r_prop1 = pool.get_property(id, "roughness");
+    REQUIRE(r_prop1.is_ok());
+    CHECK(std::get<float>(r_prop1.value()) == 0.5f);
+    uint32_t v1 = pool.get_version(id).value();
+
+    // Overwrite file on disk with new roughness
+    write_material_file(mat_uuid, 0.85f);
+
+    // Reload asset through AssetManager
+    REQUIRE(mgr->reload<MaterialAsset>(mat_uuid).is_ok());
+
+    // reload_all_from_source triggers sync and increments material version
+    pool.reload_all_from_source();
+    uint32_t v2 = pool.get_version(id).value();
+    CHECK(v2 > v1);
+
+    // get_property yields newly reloaded property
+    auto r_prop2 = pool.get_property(id, "roughness");
+    REQUIRE(r_prop2.is_ok());
+    CHECK(std::get<float>(r_prop2.value()) == 0.85f);
+  }
+
+  SUBCASE("reload_from_source manual trigger") {
+    auto r_id = pool.add(handle);
+    REQUIRE(r_id.is_ok());
+    MaterialID id = r_id.value();
+    CHECK(pool.is_valid(id));
+    auto r_prop1 = pool.get_property(id, "roughness");
+    REQUIRE(r_prop1.is_ok());
+    CHECK(std::get<float>(r_prop1.value()) == 0.5f);
+
+    // Modify runtime property
+    REQUIRE(pool.set_property(id, "roughness", 0.123f).is_ok());
+    auto r_prop2 = pool.get_property(id, "roughness");
+    REQUIRE(r_prop2.is_ok());
+    CHECK(std::get<float>(r_prop2.value()) == 0.123f);
+    uint32_t v_mod = pool.get_version(id).value();
+
+    // Trigger reload_from_source
+    REQUIRE(pool.reload_from_source(id).is_ok());
+    uint32_t v_reloaded = pool.get_version(id).value();
+    CHECK(v_reloaded > v_mod);
+    auto r_prop3 = pool.get_property(id, "roughness");
+    REQUIRE(r_prop3.is_ok());
+    CHECK(std::get<float>(r_prop3.value()) == 0.5f);
+  }
+
+  std::filesystem::remove_all(temp_dir);
 }

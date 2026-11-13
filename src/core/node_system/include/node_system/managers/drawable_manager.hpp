@@ -75,7 +75,10 @@ public:
     if constexpr (TReflector::is_writing()) {
       UUID mat_uuid{};
       if (drawable.material_id != MaterialID::INVALID) {
-        mat_uuid = material_pool->get_uuid(drawable.material_id);
+        auto r_uuid = material_pool->get_uuid(drawable.material_id);
+        if (r_uuid) {
+          mat_uuid = r_uuid.value();
+        }
       }
       serialize(re, "material_uuid", mat_uuid);
     } else {
@@ -87,7 +90,10 @@ public:
       if (!mat_uuid.is_nil()) {
         auto r_mat_asset = asset_manager->acquire<MaterialAsset>(mat_uuid);
         if (r_mat_asset) {
-          drawable.material_id = material_pool->acquire_material(r_mat_asset.value());
+          auto r_mat_id = material_pool->add(r_mat_asset.value());
+          if (r_mat_id) {
+            drawable.material_id = r_mat_id.value();
+          }
         }
       }
     }
@@ -100,4 +106,4 @@ private:
   AssetManager* asset_manager;
 };
 
-} // mole
+} // namespace mole

@@ -22,21 +22,21 @@
 
 namespace mole {
 
-WorkspaceState::WorkspaceState(std::unique_ptr<Project> project)
-    : project(std::move(project)), file_system(nullptr), asset_manager(nullptr), process_orchestrator(nullptr) {}
+WorkspaceState::WorkspaceState(const EditorContext& context) :
+    file_system(context.os_context->file_system), 
+    asset_manager(context.resources_context->asset_manager),
+    material_pool(context.resources_context->material_pool),
+    process_orchestrator(context.process_orchestrator) {}
 
 const Project& WorkspaceState::get_project() const { return *project; }
 
 const ProjectAssets& WorkspaceState::get_project_assets() const { return *project_assets; }
 
-Result<std::unique_ptr<WorkspaceState>> WorkspaceState::create(std::unique_ptr<Project> project,
-                                                               const EditorContext& context) {
-  std::unique_ptr<WorkspaceState> state(new WorkspaceState(std::move(project)));
+Result<std::unique_ptr<WorkspaceState>> WorkspaceState::create(std::unique_ptr<Project> project, const EditorContext& context) {
+  std::unique_ptr<WorkspaceState> state(new WorkspaceState(context));
 
+  state->project = std::move(project);
   state->project_assets = std::make_unique<ProjectAssets>(context);
-  state->process_orchestrator = context.process_orchestrator;
-  state->file_system = context.os_context->file_system;
-  state->asset_manager = context.resources_context->asset_manager;
 
   std::filesystem::path project_location = state->project->get_location();
   state->file_system->mount("project", project_location);
@@ -149,6 +149,14 @@ void WorkspaceState::update() {
                   std::cerr << "Failed to reload asset " << uuid.to_string() << ": " << r_reload.error() << std::endl;
                 } else {
                   std::cout << "Reloaded asset " << uuid.to_string() << std::endl;
+                  if (material_pool->is_valid(uuid)) {
+                    auto r_reload_mat = material_pool->reload_from_source(uuid);
+                    if (r_reload_mat) {
+                      std::cout << "Reloaded asset " << uuid.to_string() << std::endl;
+                    } else {
+                      std::cerr << "Failed to reload material " << uuid.to_string() << ": " << r_reload_mat.error() << std::endl;
+                    }
+                  }
                 }
               }
             }

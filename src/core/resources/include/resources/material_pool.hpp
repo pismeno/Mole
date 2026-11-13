@@ -1,10 +1,11 @@
 #pragma once
 
+#include <concepts>
 #include <cstdint>
-#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "resources/asset_handle.hpp"
@@ -14,7 +15,6 @@
 #include "resources/material_types.hpp"
 #include "utils/creflector.hpp"
 #include "utils/result.hpp"
-#include "utils/string_hash.hpp"
 #include "utils/uuid.hpp"
 
 namespace mole {
@@ -26,91 +26,127 @@ public:
   explicit MaterialPool(const ResourcesContext& context);
   ~MaterialPool() = default;
 
-  [[nodiscard]] const Material& get(MaterialID material_id) const;
-  [[nodiscard]] MaterialID get_id(std::string_view string_material_id) const;
-  [[nodiscard]] uint32_t get_version(MaterialID material_id) const;
-  [[nodiscard]] uint32_t get_version(std::string_view string_material_id) const;
-  [[nodiscard]] bool is_valid(MaterialID material_id) const;
-  [[nodiscard]] bool is_valid(std::string_view string_material_id) const;
+  template <std::invocable<const Material&> TFunction>
+  Result<void> with_material(MaterialID material_id, TFunction&& fn) const {
+    if (!is_valid(material_id)) {
+      return mole::fail("MaterialID is invalid");
+    }
+    std::forward<TFunction>(fn)(entries[material_id.index()].material);
+    return mole::ok();
+  }
 
-  MaterialID add(std::string_view string_id, Material material);
-  MaterialID add(std::string_view string_id, Material material, UUID uuid);
-  MaterialID acquire_material(const AssetHandle<MaterialAsset>& asset);
-  [[nodiscard]] UUID get_uuid(MaterialID material_id) const;
+  template <std::invocable<const Material&> TFunction>
+  Result<void> with_material(UUID uuid, TFunction&& fn) const {
+    return with_material(get_id(uuid), fn);
+  }
 
-  void destroy(std::string_view string_material_id);
-  void destroy(MaterialID material_id);
+  Result<AssetHandle<VertexShaderAsset>> get_vertex_shader(MaterialID material_id) const;
+  Result<AssetHandle<VertexShaderAsset>> get_vertex_shader(UUID uuid) const;
+  Result<AssetHandle<FragmentShaderAsset>> get_fragment_shader(MaterialID material_id) const;
+  Result<AssetHandle<FragmentShaderAsset>> get_fragment_shader(UUID uuid) const;
+  Result<MaterialProperty> get_property(MaterialID material_id, std::string_view property) const;
+  Result<MaterialProperty> get_property(UUID uuid, std::string_view property) const;
+
+  Result<UUID> get_uuid(MaterialID material_id) const;
+
+  Result<uint32_t> get_version(MaterialID material_id) const;
+  Result<uint32_t> get_version(UUID uuid) const;
+
+  [[nodiscard]] bool is_valid(MaterialID material_id) const noexcept;
+  [[nodiscard]] bool is_valid(UUID uuid) const noexcept;
+
+  Result<MaterialID> get_id(UUID uuid) const;
+
+  MaterialID add(Material material);
+  Result<MaterialID> add(const AssetHandle<MaterialAsset>& asset);
+
+  Result<void> set_property(MaterialID material_id, std::string_view property, MaterialProperty value);
+  Result<void> set_property(UUID uuid, std::string_view property, MaterialProperty value);
+  Result<void> set_vertex_shader(MaterialID material_id, AssetHandle<VertexShaderAsset> shader);
+  Result<void> set_vertex_shader(UUID uuid, AssetHandle<VertexShaderAsset> shader);
+  Result<void> set_fragment_shader(MaterialID material_id, AssetHandle<FragmentShaderAsset> shader);
+  Result<void> set_fragment_shader(UUID uuid, AssetHandle<FragmentShaderAsset> shader);
+
+  Result<void> set_source_asset(MaterialID material_id, AssetHandle<MaterialAsset> asset);
+  Result<AssetHandle<MaterialAsset>> get_source_asset(MaterialID material_id) const;
+
+  Result<void> reload_from_source(MaterialID material_id);
+  Result<void> reload_from_source(UUID uuid);
+  void reload_all_from_source();
+
+  Result<void> destroy(MaterialID material_id);
+  Result<void> destroy(UUID uuid);
   void clear();
 
-  void set_property(MaterialID material_id, std::string_view property, MaterialProperty value);
-  void set_property(std::string_view string_material_id, std::string_view property, MaterialProperty value);
-
   template <CReflector TReflector>
-  requires(TReflector::is_writing())
-  void save_material(TReflector& re, MaterialID material_id) const {
-    if (!is_valid(material_id)) return;
-    const Material& mat = get(material_id);
+    requires(TReflector::is_writing())
+  Result<void> save_material(TReflector& re, MaterialID material_id) const {
+    return with_material(material_id, [&](const Material& mat) {
+      UUID vert_uuid = mat.vertex_shader ? mat.vertex_shader.get_uuid() : UUID{};
+      UUID frag_uuid = mat.fragment_shader ? mat.fragment_shader.get_uuid() : UUID{};
 
-    UUID vert_uuid = mat.vertex_shader ? mat.vertex_shader.get_uuid() : UUID{};
-    UUID frag_uuid = mat.fragment_shader ? mat.fragment_shader.get_uuid() : UUID{};
+      serialize(re, "vertex_shader", vert_uuid);
+      serialize(re, "fragment_shader", frag_uuid);
 
-    serialize(re, "vertex_shader", vert_uuid);
-    serialize(re, "fragment_shader", frag_uuid);
+      uint32_t prop_count = static_cast<uint32_t>(mat.properties.size());
+      re.begin_array("properties", prop_count);
 
-    uint32_t prop_count = static_cast<uint32_t>(mat.properties.size());
-    re.begin_array("properties", prop_count);
+      for (const auto& [name, prop] : mat.properties) {
+        re.begin_object(nullptr);
+        std::string name_copy = name;
+        serialize(re, "name", name_copy);
 
-    for (const auto& [name, prop] : mat.properties) {
-      re.begin_object(nullptr);
-      std::string name_copy = name;
-      serialize(re, "name", name_copy);
+        std::visit(
+            [&](const auto& val) {
+              using T = std::decay_t<decltype(val)>;
+              if constexpr (std::is_same_v<T, float>) {
+                EMaterialPropertyType type = EMaterialPropertyType::Float;
+                serialize(re, "type", type);
+                float f = val;
+                serialize(re, "value", f);
+              } else if constexpr (std::is_same_v<T, int>) {
+                EMaterialPropertyType type = EMaterialPropertyType::Int;
+                serialize(re, "type", type);
+                int32_t i = static_cast<int32_t>(val);
+                serialize(re, "value", i);
+              } else if constexpr (std::is_same_v<T, glm::vec2>) {
+                EMaterialPropertyType type = EMaterialPropertyType::Vec2;
+                serialize(re, "type", type);
+                glm::vec2 v = val;
+                serialize(re, "value", v);
+              } else if constexpr (std::is_same_v<T, glm::vec3>) {
+                EMaterialPropertyType type = EMaterialPropertyType::Vec3;
+                serialize(re, "type", type);
+                glm::vec3 v = val;
+                serialize(re, "value", v);
+              } else if constexpr (std::is_same_v<T, glm::vec4>) {
+                EMaterialPropertyType type = EMaterialPropertyType::Vec4;
+                serialize(re, "type", type);
+                glm::vec4 v = val;
+                serialize(re, "value", v);
+              } else if constexpr (std::is_same_v<T, AssetHandle<ImageAsset>>) {
+                EMaterialPropertyType type = EMaterialPropertyType::Texture;
+                serialize(re, "type", type);
+                UUID tex_uuid = val ? val.get_uuid() : UUID{};
+                serialize(re, "value", tex_uuid);
+              }
+            },
+            prop);
 
-      std::visit(
-          [&](const auto& val) {
-            using T = std::decay_t<decltype(val)>;
-            if constexpr (std::is_same_v<T, float>) {
-              EMaterialPropertyType type = EMaterialPropertyType::Float;
-              serialize(re, "type", type);
-              float f = val;
-              serialize(re, "value", f);
-            } else if constexpr (std::is_same_v<T, int>) {
-              EMaterialPropertyType type = EMaterialPropertyType::Int;
-              serialize(re, "type", type);
-              int32_t i = static_cast<int32_t>(val);
-              serialize(re, "value", i);
-            } else if constexpr (std::is_same_v<T, glm::vec2>) {
-              EMaterialPropertyType type = EMaterialPropertyType::Vec2;
-              serialize(re, "type", type);
-              glm::vec2 v = val;
-              serialize(re, "value", v);
-            } else if constexpr (std::is_same_v<T, glm::vec3>) {
-              EMaterialPropertyType type = EMaterialPropertyType::Vec3;
-              serialize(re, "type", type);
-              glm::vec3 v = val;
-              serialize(re, "value", v);
-            } else if constexpr (std::is_same_v<T, glm::vec4>) {
-              EMaterialPropertyType type = EMaterialPropertyType::Vec4;
-              serialize(re, "type", type);
-              glm::vec4 v = val;
-              serialize(re, "value", v);
-            } else if constexpr (std::is_same_v<T, AssetHandle<ImageAsset>>) {
-              EMaterialPropertyType type = EMaterialPropertyType::Texture;
-              serialize(re, "type", type);
-              UUID tex_uuid = val ? val.get_uuid() : UUID{};
-              serialize(re, "value", tex_uuid);
-            }
-          },
-          prop);
+        re.end_object();
+      }
 
-      re.end_object();
-    }
-
-    re.end_array();
+      re.end_array();
+    });
   }
 
   template <CReflector TReflector>
-  requires(!TReflector::is_writing())
+    requires(!TReflector::is_writing())
   Result<MaterialID> load_material(TReflector& re, UUID material_uuid = {}) {
+    if (!asset_manager) {
+      return mole::fail("AssetManager is null; cannot load material dependencies");
+    }
+
     UUID vert_uuid{};
     UUID frag_uuid{};
     serialize(re, "vertex_shader", vert_uuid);
@@ -189,18 +225,27 @@ public:
 
     re.end_array();
 
-    std::string id_str = material_uuid.is_nil() ? "" : material_uuid.to_string();
-    MaterialID id = add(id_str, std::move(mat), material_uuid);
+    MaterialID id = add(std::move(mat));
+    if (!material_uuid.is_nil()) {
+      entries[id.index()].uuid = material_uuid;
+      uuid_to_id[material_uuid] = id;
+    }
     return id;
   }
 
 private:
-  std::unordered_map<std::string, MaterialID, StringHash, std::equal_to<>> string_id_lookup;
+  struct MaterialEntry {
+    Material material{};
+    uint32_t generation{0};
+    uint32_t version{0};
+    UUID uuid{};
+    AssetHandle<MaterialAsset> source_asset{};
+    uint32_t synced_asset_version{0};
+    bool alive{false};
+  };
+
   std::unordered_map<UUID, MaterialID> uuid_to_id;
-  std::vector<Material> materials;
-  std::vector<uint32_t> generations;
-  std::vector<uint32_t> material_versions;
-  std::vector<UUID> material_uuids;
+  std::vector<MaterialEntry> entries;
 
   uint32_t next_unused_index{0};
   std::vector<uint32_t> recycled_indices;

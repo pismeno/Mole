@@ -41,6 +41,8 @@ public:
   [[nodiscard]] inline uint32_t get_generation() const noexcept { return generation; }
 
   [[nodiscard]] UUID get_uuid() const noexcept;
+  operator UUID() const noexcept { return get_uuid(); }
+  
   [[nodiscard]] uint32_t get_version() const noexcept;
 
 private:

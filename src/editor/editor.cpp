@@ -215,26 +215,22 @@ Result<void> Editor::load_workspace() {
   if (!r_get_frag_shader_b) return mole::fail(r_get_frag_shader_b.error());
   AssetHandle<FragmentShaderAsset> frag_shader_b = std::move(r_get_frag_shader_b).value();
 
-  material_pool->add("test_mat_a", Material{
-                                       .properties = {{"test_texture", texture}},
-                                       .vertex_shader = std::move(vert_shader_a),
-                                       .fragment_shader = std::move(frag_shader_a),
-                                   });
+  MaterialID test_mat_id = material_pool->add(Material{
+      .properties = {{"test_texture", texture}},
+      .vertex_shader = std::move(vert_shader_a),
+      .fragment_shader = std::move(frag_shader_a),
+  });
 
-  material_pool->add("test_mat_b",
-                     Material{
-                         .properties = {{"test_texture", texture}, {"tint", glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)}},
-                         .vertex_shader = std::move(vert_shader_b),
-                         .fragment_shader = std::move(frag_shader_b),
-                     });
+  MaterialID test_mat_id2 = material_pool->add(Material{
+      .properties = {{"test_texture", texture}, {"tint", glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)}},
+      .vertex_shader = std::move(vert_shader_b),
+      .fragment_shader = std::move(frag_shader_b),
+  });
 
   auto r_get_scene_texture =
       asset_manager->acquire<ImageAsset>(UUID::from_string("d85b0261-9ade-40c0-8f08-86546420eb96"));
   if (!r_get_scene_texture) return mole::fail(r_get_scene_texture.error());
   AssetHandle<ImageAsset> scene_texture = std::move(r_get_scene_texture).value();
-
-  MaterialID test_mat_id = MaterialID::from(0, 0);
-  MaterialID test_mat_id2 = MaterialID::from(1, 0);
 
   auto r_scene = scene_factory->create_scene("scene_2d");
   if (!r_scene) return mole::fail(r_scene.error());
@@ -301,7 +297,7 @@ Result<void> Editor::load_workspace() {
   auto r_z_3 = drawable_manager->set_node_z_index(child_node2, 2);
   if (!r_z_3) return r_z_3;
 
-  /* 
+  /*
   auto r_uuid = workspace_state->get_project_assets().resolve("scene.json", EAssetType::Scene);
   if (!r_uuid) return mole::fail(r_uuid.error());
   auto r_scene_asset = asset_manager->acquire<SceneAsset>(r_uuid.value());
@@ -359,11 +355,11 @@ Result<void> Editor::run() {
       MaterialID test_mat_id2 = MaterialID::from(1, 0);
 
       if (inputs.is_key_pressed(EKeyCode::M)) {
-        material_pool->set_property(test_mat_id2, "tint", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+        (void)material_pool->set_property(test_mat_id2, "tint", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
       }
 
       if (inputs.is_key_released(EKeyCode::M)) {
-        material_pool->set_property(test_mat_id2, "tint", glm::vec4(0.0f, 1.0f, 1.0f, 1.0f));
+        (void)material_pool->set_property(test_mat_id2, "tint", glm::vec4(0.0f, 1.0f, 1.0f, 1.0f));
       }
 
       auto* transform_manager = scene->get_manager<TransformManager>();
@@ -475,4 +471,4 @@ Result<void> Editor::shutdown() {
   return mole::ok();
 }
 
-} // mole
+} // namespace mole

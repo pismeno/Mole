@@ -106,6 +106,8 @@ struct Material {
 
   AssetHandle<VertexShaderAsset> vertex_shader;
   AssetHandle<FragmentShaderAsset> fragment_shader;
+
+  static const Material FALLBACK;
 };
 
 } // mole
