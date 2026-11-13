@@ -9,6 +9,8 @@
 
 #include "node_system/inode_manager.hpp"
 #include "node_system/manager_reflector_binder.hpp"
+#include "node_system/engine_managers.hpp"
+#include "node_system/manager_reflector_binder_factory.hpp"
 #include "node_system/scene.hpp"
 #include "utils/result.hpp"
 #include "utils/creflector.hpp"
@@ -49,10 +51,8 @@ class SceneFactory {
     */
   template <CReflector TReflector>
   requires (TReflector::is_writing())
-  void save_scene(
-      TReflector& re, 
-      const Scene& scene, 
-      const ManagerReflectorBinder<TReflector>& binder) const {
+  void save_scene(TReflector& re, const Scene& scene) const {
+    auto binder = manager_reflector_binder_factory->create_binder<TReflector>();
     
     // Write scene_type header
     std::string scene_type = scene.scene_type_name;
@@ -91,7 +91,7 @@ class SceneFactory {
       auto def_it = scene.node_type_definitions.find(node_type_str);
       if (def_it != scene.node_type_definitions.end()) {
         for (INodeManager* mgr : def_it->second.managers) {
-          if (const auto* entry = binder.get_entry(mgr->get_name())) {
+          if (const auto* entry = binder->get_entry(mgr->get_name())) {
             re.begin_object(entry->type_id);
             // Note: binder's reflect takes non-const Scene& as INodeResolver, 
             // const_cast is safe here since TReflector::is_writing() is true.
@@ -113,9 +113,8 @@ class SceneFactory {
     */
   template <CReflector TReflector>
   requires (!TReflector::is_writing())
-  Result<std::unique_ptr<Scene>> load_scene(
-      TReflector& re, 
-      const ManagerReflectorBinder<TReflector>& binder) const {
+  Result<std::unique_ptr<Scene>> load_scene(TReflector& re) const {
+    auto binder = manager_reflector_binder_factory->create_binder<TReflector>();
     
     // Read scene_type first and construct the properly configured Scene
     std::string scene_type;
@@ -158,7 +157,7 @@ class SceneFactory {
       auto def_it = scene->node_type_definitions.find(node_type_str);
       if (def_it != scene->node_type_definitions.end()) {
         for (INodeManager* mgr : def_it->second.managers) {
-          if (const auto* entry = binder.get_entry(mgr->get_name())) {
+          if (const auto* entry = binder->get_entry(mgr->get_name())) {
             re.begin_object(entry->type_id);
             entry->reflect(mgr, runtime_node, re, *scene);
             re.end_object();
@@ -201,7 +200,6 @@ class SceneFactory {
    * @brief Creates a SceneFactory instance.
    */
   static Result<std::unique_ptr<SceneFactory>> create(const NodeSystemContext& context);
-
 private:
   explicit SceneFactory() = default;
 
@@ -222,6 +220,7 @@ private:
 
   AssetManager* asset_manager = nullptr;
   IFileSystem* file_system = nullptr;
+  ManagerReflectorBinderFactory<EngineManagers>* manager_reflector_binder_factory;
 };
 
 } // mole

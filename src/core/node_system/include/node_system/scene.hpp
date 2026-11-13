@@ -15,7 +15,10 @@
 #include "node_system/inode_resolver.hpp"
 #include "node_system/inode_manager.hpp"
 #include "node_system/node.hpp"
+#include "node_system/node_system_context.hpp"
 #include "node_system/node_types.hpp"
+#include "node_system/engine_managers.hpp"
+#include "node_system/manager_reflector_binder_factory.hpp"
 #include "utils/string_hash.hpp"
 #include "utils/uuid.hpp"
 #include "utils/result.hpp"
@@ -23,7 +26,7 @@
 namespace mole {
 
 class SceneFactory;
-  
+
 class Scene : public INodeResolver {
 
   friend class SceneFactory;

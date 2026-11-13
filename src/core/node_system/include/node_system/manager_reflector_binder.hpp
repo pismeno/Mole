@@ -16,12 +16,17 @@ namespace mole {
 template<CReflector TReflector>
 class ManagerReflectorBinder {
  public:
-  using ReflectFn = void (*)(INodeManager* mgr, NodeID node_id, TReflector& re, INodeResolver& resolver);
-
-  struct Entry {
-    const char* type_id = nullptr;
-    ReflectFn reflect = nullptr;
-  };
+   using ReflectFn = void (*)(INodeManager* mgr, NodeID node_id, TReflector& re, INodeResolver& resolver);
+ 
+   struct Entry {
+     const char* type_id = nullptr;
+     ReflectFn reflect = nullptr;
+   };
+   
+   template<typename... TManagers>
+   explicit ManagerReflectorBinder(ManagerList<TManagers...>) {
+     (bind<TManagers>(), ...);
+   }
 
   [[nodiscard]] const Entry* get_entry(std::string_view type_id) const noexcept {
     auto it = map_entries.find(std::string(type_id)); 
@@ -30,14 +35,6 @@ class ManagerReflectorBinder {
     }
     return nullptr;
   }
-
-  template<typename... Managers>
-  [[nodiscard]] static ManagerReflectorBinder<TReflector> create(ManagerList<Managers...>) {
-    ManagerReflectorBinder<TReflector> binder;
-    (binder.template bind<Managers>(), ...);
-    return binder;
-  }
-
  private:
   std::unordered_map<std::string, Entry> map_entries;
 

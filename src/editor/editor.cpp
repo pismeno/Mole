@@ -18,14 +18,13 @@
 #include "editor/project_assets.hpp"
 #include "editor/states/workspace_state.hpp"
 #include "editor/subprocess.hpp"
-#include "node_system/manager_list.hpp"
-#include "node_system/manager_reflector_binder.hpp"
 #include "node_system/managers/camera_manager.hpp"
 #include "node_system/managers/drawable_manager.hpp"
 #include "node_system/managers/transform_manager.hpp"
 #include "node_system/node_system_context.hpp"
 #include "node_system/render_gatherer.hpp"
 #include "node_system/scene.hpp"
+#include "node_system/engine_managers.hpp"
 #include "node_system/scene_factory.hpp"
 #include "osal/ifile_system.hpp"
 #include "osal/inputs.hpp"
@@ -106,6 +105,9 @@ Result<void> Editor::init() {
   render_gatherer = std::make_unique<RenderGatherer>();
   node_system_context.render_gatherer = render_gatherer.get();
 
+  manager_reflector_binder_factory = std::make_unique<ManagerReflectorBinderFactory<EngineManagers>>();
+  node_system_context.manager_reflector_binder_factory = manager_reflector_binder_factory.get();
+
   scene_factory->register_manager<TransformManager>();
   scene_factory->register_manager<DrawableManager>();
   scene_factory->register_manager<CameraManager>();
@@ -124,12 +126,16 @@ Result<void> Editor::init() {
   rendering_context.packed_material_cache = packed_material_cache.get();
 
   process_orchestrator = std::make_unique<ProcessOrchestrator>();
+  manager_reflector_binder_factory = std::make_unique<ManagerReflectorBinderFactory<EngineManagers>>();
 
-  context = {.node_system_context = &node_system_context,
-             .rendering_context = &rendering_context,
-             .os_context = &os_context,
-             .resources_context = &resources_context,
-             .process_orchestrator = process_orchestrator.get()};
+  context = {
+    .node_system_context = &node_system_context,
+    .rendering_context = &rendering_context,
+    .os_context = &os_context,
+    .resources_context = &resources_context,
+    
+    .process_orchestrator = process_orchestrator.get(),
+  };
 
   RendererOptions renderer_options{RendererType::Vulkan, window->get_native_handle(), window->get_framebuffer_width(),
                                    window->get_framebuffer_height()};
@@ -330,15 +336,10 @@ Result<void> Editor::run() {
 
     if (inputs.is_key_pressed(KeyCode::J)) {
       if (scene) {
-        nlohmann::json j;
-        JsonWriteReflector writer(j);
-        auto binder = ManagerReflectorBinder<JsonWriteReflector>::create(
-            ManagerList<TransformManager, DrawableManager, CameraManager>{});
-        
-        // Use SceneFactory to serialize the scene
-        scene_factory->save_scene(writer, *scene, binder);
-        
-        std::cout << j.dump(2) << std::endl;
+        nlohmann::json json;
+        JsonWriteReflector writer(json);
+        scene_factory->save_scene(writer, *scene);
+        std::cout << json.dump(2) << std::endl;
       }
     }
 

@@ -37,6 +37,7 @@ Result<std::unique_ptr<SceneFactory>> SceneFactory::create(const NodeSystemConte
 Result<void> SceneFactory::init(const NodeSystemContext& context) {
   asset_manager = context.resources_context->asset_manager;
   file_system = context.resources_context->os_context->file_system;
+  manager_reflector_binder_factory = context.manager_reflector_binder_factory;
   return mole::ok();
 }
 

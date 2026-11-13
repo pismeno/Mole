@@ -1,5 +1,7 @@
 #pragma once
 
+#include <concepts>
+
 #include "node_system/inode_manager.hpp"
 
 namespace mole {
