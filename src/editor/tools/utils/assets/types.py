@@ -11,6 +11,8 @@ class AssetType(enum.IntEnum):
     TESS_CONTROL_SHADER = 7
     TESS_EVALUATION_SHADER = 8
     IMAGE = 9
+    SCENE = 10
+    MATERIAL = 11
 
     @classmethod
     def _missing_(cls, value):

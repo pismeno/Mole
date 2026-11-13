@@ -57,32 +57,40 @@ for file_path_str in args.files:
         mime_type = puremagic.from_file(str(file_path), mime=True)
     except (puremagic.PureError, ValueError) as e:
         print(f"Could not identify file type for {file_path}: {e}")
-        continue
+        mime_type = None
 
     cooked_assets: list[dict] = []
+    name_lower = file_path.name.lower()
 
-    match mime_type.split("/"):
-        case ["image", "png" | "jpeg" | "jpg"]:
-            append_type(cooked_assets, old_cooked_assets, AssetType.IMAGE)
-        case ["text", _] | ["application", "json"]:
-            if file_path.name.endswith(".glsl"):
-                file_name_ns = file_path.name.removesuffix(".glsl")
-                if file_name_ns.endswith(".vert"):
-                    append_type(cooked_assets, old_cooked_assets, AssetType.VERTEX_SHADER)
-                elif file_name_ns.endswith(".frag"):
-                    append_type(cooked_assets, old_cooked_assets, AssetType.FRAGMENT_SHADER)
-                elif file_name_ns.endswith(".comp"):
-                    append_type(cooked_assets, old_cooked_assets, AssetType.COMPUTE_SHADER)
-                elif file_name_ns.endswith(".geom"):
-                    append_type(cooked_assets, old_cooked_assets, AssetType.GEOMETRY_SHADER)
-                elif file_name_ns.endswith(".tesc"):
-                    append_type(cooked_assets, old_cooked_assets, AssetType.TESS_CONTROL_SHADER)
-                elif file_name_ns.endswith(".tese"):
-                    append_type(cooked_assets, old_cooked_assets, AssetType.TESS_EVALUATION_SHADER)
-            else:
-                append_type(cooked_assets, old_cooked_assets, AssetType.TEXT)
-        case _:
-            print(f"Unknown type by Mole engine for file {file_path}")
+    if name_lower.endswith(".scene") or name_lower.endswith(".scene.json"):
+        append_type(cooked_assets, old_cooked_assets, AssetType.SCENE)
+    elif name_lower.endswith(".mat") or name_lower.endswith(".material") or name_lower.endswith(".mat.json"):
+        append_type(cooked_assets, old_cooked_assets, AssetType.MATERIAL)
+    elif mime_type:
+        match mime_type.split("/"):
+            case ["image", "png" | "jpeg" | "jpg"]:
+                append_type(cooked_assets, old_cooked_assets, AssetType.IMAGE)
+            case ["text", _] | ["application", "json"]:
+                if file_path.name.endswith(".glsl"):
+                    file_name_ns = file_path.name.removesuffix(".glsl")
+                    if file_name_ns.endswith(".vert"):
+                        append_type(cooked_assets, old_cooked_assets, AssetType.VERTEX_SHADER)
+                    elif file_name_ns.endswith(".frag"):
+                        append_type(cooked_assets, old_cooked_assets, AssetType.FRAGMENT_SHADER)
+                    elif file_name_ns.endswith(".comp"):
+                        append_type(cooked_assets, old_cooked_assets, AssetType.COMPUTE_SHADER)
+                    elif file_name_ns.endswith(".geom"):
+                        append_type(cooked_assets, old_cooked_assets, AssetType.GEOMETRY_SHADER)
+                    elif file_name_ns.endswith(".tesc"):
+                        append_type(cooked_assets, old_cooked_assets, AssetType.TESS_CONTROL_SHADER)
+                    elif file_name_ns.endswith(".tese"):
+                        append_type(cooked_assets, old_cooked_assets, AssetType.TESS_EVALUATION_SHADER)
+                else:
+                    append_type(cooked_assets, old_cooked_assets, AssetType.TEXT)
+            case _:
+                print(f"Unknown type by Mole engine for file {file_path}")
+    else:
+        print(f"Could not identify file type for {file_path}")
 
     meta_content = { "cooked_assets" : cooked_assets }
 

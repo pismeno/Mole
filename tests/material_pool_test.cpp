@@ -5,11 +5,13 @@
 #include "resources/material.hpp"
 #include "resources/material_pool.hpp"
 #include "resources/material_types.hpp"
+#include "resources/resources_context.hpp"
 
 using namespace mole;
 
 TEST_CASE("MaterialPool: Basic Add and Validity") {
-  MaterialPool pool;
+  ResourcesContext res_ctx;
+  MaterialPool pool(res_ctx);
   Material mat;
 
   MaterialID id = pool.add("mat_base", mat);
@@ -21,7 +23,8 @@ TEST_CASE("MaterialPool: Basic Add and Validity") {
 }
 
 TEST_CASE("MaterialPool: Version increases on set_property") {
-  MaterialPool pool;
+  ResourcesContext res_ctx;
+  MaterialPool pool(res_ctx);
   Material mat;
   MaterialID id = pool.add("mat_version_test", mat);
 
@@ -52,7 +55,8 @@ TEST_CASE("MaterialPool: Version increases on set_property") {
 }
 
 TEST_CASE("MaterialPool: Generations behave correctly on destroy/reuse") {
-  MaterialPool pool;
+  ResourcesContext res_ctx;
+  MaterialPool pool(res_ctx);
   Material mat;
 
   MaterialID id1 = pool.add("mat_gen_1", mat);
@@ -80,7 +84,8 @@ TEST_CASE("MaterialPool: Generations behave correctly on destroy/reuse") {
 }
 
 TEST_CASE("MaterialPool: Destroying by String ID updates generations") {
-  MaterialPool pool;
+  ResourcesContext res_ctx;
+  MaterialPool pool(res_ctx);
   Material mat;
 
   MaterialID id1 = pool.add("mat_str_destroy", mat);
@@ -94,7 +99,8 @@ TEST_CASE("MaterialPool: Destroying by String ID updates generations") {
 }
 
 TEST_CASE("MaterialPool: clear() invalidates all existing IDs") {
-  MaterialPool pool;
+  ResourcesContext res_ctx;
+  MaterialPool pool(res_ctx);
   Material mat;
 
   MaterialID id1 = pool.add("mat1", mat);
