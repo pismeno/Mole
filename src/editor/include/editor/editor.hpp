@@ -67,9 +67,6 @@ class Editor {
   std::unique_ptr<IWindow> window;
   std::unique_ptr<Scene> scene;
   std::unique_ptr<IEditorState> state;
-
-  // Cache these to interact with the active scene
-  NodeID root_node; // Using default 0 assuming NodeID maps to an int internally, adjust type if it's a strongly typed class
 };
 
 } // mole

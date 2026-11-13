@@ -6,6 +6,7 @@
 #include <memory>
 #include <thread>
 #include <utility>
+#include "resources/material_types.hpp"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -184,54 +185,6 @@ Result<void> Editor::load_workspace() {
   auto r_load_node_defs = scene_factory->load_node_definitions_from(node_defs->as_string_view());
   if (!r_load_node_defs) return mole::fail(r_load_node_defs.error());
 
-  r_res_uuid = workspace_state->get_project_assets().resolve("test_img.png", EAssetType::Image);
-  if (!r_res_uuid) return mole::fail(r_res_uuid.error());
-  auto r_get_texture = asset_manager->acquire<ImageAsset>(r_res_uuid.value());
-  if (!r_get_texture) return mole::fail(r_get_texture.error());
-  AssetHandle<ImageAsset> texture = std::move(r_get_texture).value();
-  std::cout << bindless_texture_registry->get_index(texture) << " - Tex index" << std::endl;
-
-  r_res_uuid = workspace_state->get_project_assets().resolve("mat_a.vert.glsl", EAssetType::VertexShader);
-  if (!r_res_uuid) return mole::fail(r_res_uuid.error());
-  auto r_get_vert_shader_a = asset_manager->acquire<VertexShaderAsset>(r_res_uuid.value());
-  if (!r_get_vert_shader_a) return mole::fail(r_get_vert_shader_a.error());
-  AssetHandle<VertexShaderAsset> vert_shader_a = std::move(r_get_vert_shader_a).value();
-
-  r_res_uuid = workspace_state->get_project_assets().resolve("mat_a.frag.glsl", EAssetType::FragmentShader);
-  if (!r_res_uuid) return mole::fail(r_res_uuid.error());
-  auto r_get_frag_shader_a = asset_manager->acquire<FragmentShaderAsset>(r_res_uuid.value());
-  if (!r_get_frag_shader_a) return mole::fail(r_get_frag_shader_a.error());
-  AssetHandle<FragmentShaderAsset> frag_shader_a = std::move(r_get_frag_shader_a).value();
-
-  r_res_uuid = workspace_state->get_project_assets().resolve("mat_b.vert.glsl", EAssetType::VertexShader);
-  if (!r_res_uuid) return mole::fail(r_res_uuid.error());
-  auto r_get_vert_shader_b = asset_manager->acquire<VertexShaderAsset>(r_res_uuid.value());
-  if (!r_get_vert_shader_b) return mole::fail(r_get_vert_shader_b.error());
-  AssetHandle<VertexShaderAsset> vert_shader_b = std::move(r_get_vert_shader_b).value();
-
-  r_res_uuid = workspace_state->get_project_assets().resolve("mat_b.frag.glsl", EAssetType::FragmentShader);
-  if (!r_res_uuid) return mole::fail(r_res_uuid.error());
-  auto r_get_frag_shader_b = asset_manager->acquire<FragmentShaderAsset>(r_res_uuid.value());
-  if (!r_get_frag_shader_b) return mole::fail(r_get_frag_shader_b.error());
-  AssetHandle<FragmentShaderAsset> frag_shader_b = std::move(r_get_frag_shader_b).value();
-
-  MaterialID test_mat_id = material_pool->add(Material{
-      .properties = {{"test_texture", texture}},
-      .vertex_shader = std::move(vert_shader_a),
-      .fragment_shader = std::move(frag_shader_a),
-  });
-
-  MaterialID test_mat_id2 = material_pool->add(Material{
-      .properties = {{"test_texture", texture}, {"tint", glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)}},
-      .vertex_shader = std::move(vert_shader_b),
-      .fragment_shader = std::move(frag_shader_b),
-  });
-
-  auto r_get_scene_texture =
-      asset_manager->acquire<ImageAsset>(UUID::from_string("d85b0261-9ade-40c0-8f08-86546420eb96"));
-  if (!r_get_scene_texture) return mole::fail(r_get_scene_texture.error());
-  AssetHandle<ImageAsset> scene_texture = std::move(r_get_scene_texture).value();
-
   auto r_scene = scene_factory->create_scene("scene_2d");
   if (!r_scene) return mole::fail(r_scene.error());
   scene = std::move(r_scene).value();
@@ -239,66 +192,8 @@ Result<void> Editor::load_workspace() {
   auto* transform_manager = scene->get_manager<TransformManager>();
   auto* drawable_manager = scene->get_manager<DrawableManager>();
   auto* camera_manager = scene->get_manager<CameraManager>();
-  assert(camera_manager != nullptr && "CameraManager was not created for this scene!");
-
-  NodeID camera_node = scene->create_node(NodeID::INVALID, "camera");
-
-  Camera cam_settings;
-  cam_settings.size = 50.0f; // View size in world units
-  cam_settings.zoom = 1.0f;
-  auto r_set_cam = camera_manager->set_camera(camera_node, cam_settings);
-  if (!r_set_cam) return r_set_cam;
-  auto r_set_cam_active = camera_manager->set_active_camera_node(camera_node);
-  if (!r_set_cam_active) return r_set_cam_active;
-
-  auto t_cam = transform_manager->set_node_position(camera_node, glm::vec2(0.0f, 0.0f));
-  if (!t_cam) return t_cam;
-
-  NodeID root_node = scene->create_node(NodeID::INVALID, "sprite_2d");
-  NodeID child_node1 = scene->create_node(root_node, "sprite_2d");
-  NodeID child_node2 = scene->create_node(root_node, "sprite_2d");
-
-  this->root_node = root_node;
-
-  auto t_1 = transform_manager->set_node_position(root_node, glm::vec2(0.0f, 0.0f));
-  if (!t_1) return t_1;
-  auto t_2 = transform_manager->set_node_position(child_node1, glm::vec2(1.0f, 1.0f));
-  if (!t_2) return t_2;
-  auto t_3 = transform_manager->set_node_position(child_node2, glm::vec2(1.0f, 1.5f));
-  if (!t_3) return t_3;
-
-  auto r_scale = transform_manager->set_node_scale(root_node, glm::vec2(8.0f, 8.0f));
-  if (!r_scale) return r_scale;
-  auto r_scale2 = transform_manager->set_node_scale(child_node1, glm::vec2(1.0f, 1.0f));
-  if (!r_scale2) return r_scale2;
-  auto r_scale3 = transform_manager->set_node_scale(child_node2, glm::vec2(1.0f, 1.0f));
-  if (!r_scale3) return r_scale3;
-
-  glm::vec2 world_size = glm::vec2((float)scene_texture->width / PPU, (float)scene_texture->height / PPU);
-
-  auto r_s_1 = drawable_manager->set_node_size(root_node, world_size);
-  if (!r_s_1) return r_s_1;
-  auto r_s_2 = drawable_manager->set_node_size(child_node1, world_size);
-  if (!r_s_2) return r_s_2;
-  auto r_s_3 = drawable_manager->set_node_size(child_node2, world_size);
-  if (!r_s_3) return r_s_3;
-
-  auto r_mat_1 = drawable_manager->set_node_material(root_node, test_mat_id);
-  if (!r_mat_1) return r_mat_1;
-  auto r_mat_2 = drawable_manager->set_node_material(child_node1, test_mat_id);
-  if (!r_mat_2) return r_mat_2;
-  auto r_mat_3 = drawable_manager->set_node_material(child_node2, test_mat_id2);
-  if (!r_mat_3) return r_mat_3;
-
-  auto r_z_1 = drawable_manager->set_node_z_index(root_node, 0);
-  if (!r_z_1) return r_z_1;
-  auto r_z_2 = drawable_manager->set_node_z_index(child_node1, 1);
-  if (!r_z_2) return r_z_2;
-  auto r_z_3 = drawable_manager->set_node_z_index(child_node2, 2);
-  if (!r_z_3) return r_z_3;
-
-  /*
-  auto r_uuid = workspace_state->get_project_assets().resolve("scene.json", EAssetType::Scene);
+  
+  auto r_uuid = workspace_state->get_project_assets().resolve("scene.scene.json", EAssetType::Scene);
   if (!r_uuid) return mole::fail(r_uuid.error());
   auto r_scene_asset = asset_manager->acquire<SceneAsset>(r_uuid.value());
   if (!r_scene_asset) return mole::fail(r_scene_asset.error());
@@ -309,7 +204,6 @@ Result<void> Editor::load_workspace() {
     scene = std::move(r_instantiate).value();
     std::cout << "loaded scene successfuly" << std::endl;
   }
-  */
 
   return mole::ok();
 }
@@ -361,11 +255,6 @@ Result<void> Editor::run() {
       if (inputs.is_key_released(EKeyCode::M)) {
         (void)material_pool->set_property(test_mat_id2, "tint", glm::vec4(0.0f, 1.0f, 1.0f, 1.0f));
       }
-
-      auto* transform_manager = scene->get_manager<TransformManager>();
-      auto r_move_to_mouse = transform_manager->set_node_position(
-          this->root_node, {inputs.get_mouse_x() / PPU, inputs.get_mouse_y() / PPU});
-      if (!r_move_to_mouse) return r_move_to_mouse;
 
       scene->update();
     }

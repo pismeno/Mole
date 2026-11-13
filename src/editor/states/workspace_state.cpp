@@ -152,7 +152,7 @@ void WorkspaceState::update() {
                   if (material_pool->is_valid(uuid)) {
                     auto r_reload_mat = material_pool->reload_from_source(uuid);
                     if (r_reload_mat) {
-                      std::cout << "Reloaded asset " << uuid.to_string() << std::endl;
+                      std::cout << "Reloaded material " << uuid.to_string() << std::endl;
                     } else {
                       std::cerr << "Failed to reload material " << uuid.to_string() << ": " << r_reload_mat.error() << std::endl;
                     }
