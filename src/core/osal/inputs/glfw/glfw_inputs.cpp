@@ -6,7 +6,7 @@
 
 #include "osal/windowing/glfw/glfw_window.hpp"
 
-namespace mole::inputs {
+namespace mole {
 
 bool GlfwInputs::is_key_held(EKeyCode key) noexcept { return currentKeyState[(uint16_t)key]; }
 
@@ -139,4 +139,4 @@ void GlfwInputs::handleScroll(double xoffset, double yoffset) noexcept {
   scrollY = y;
 }
 
-} // namespace mole::inputs
+} // namespace mole

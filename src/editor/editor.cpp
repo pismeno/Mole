@@ -209,9 +209,7 @@ Result<void> Editor::load_workspace() {
 }
 
 Result<void> Editor::run() {
-  using namespace inputs;
-
-  inputs::IInputs& inputs = window->get_inputs();
+  IInputs& inputs = window->get_inputs();
   while (!window->should_close()) {
     mole::ViewData view_data{};
 

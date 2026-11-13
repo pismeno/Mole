@@ -13,7 +13,7 @@ struct GLFWwindow;
 namespace mole {
 
 class GlfwWindow : public IWindow {
-  friend class inputs::GlfwInputs;
+  friend class GlfwInputs;
   friend class IWindow;
 
 public:
@@ -31,7 +31,7 @@ public:
   bool is_fullscreen() const noexcept override;
   bool is_minimized() const noexcept override;
   void set_fullscreen(bool fullscreen) override;
-  inputs::IInputs& get_inputs() override;
+  IInputs& get_inputs() override;
   void* get_native_handle() const override;
 
 private:
@@ -51,7 +51,7 @@ private:
   int windowed_x{}, windowed_y{};
   bool is_fullscreen_{};
 
-  inputs::GlfwInputs inputs;
+  GlfwInputs inputs;
 
   void window_resize_callback(GLFWwindow* window, int width, int height);
   void frame_buffer_resize_callback(GLFWwindow* window, int width, int height);

@@ -4,7 +4,7 @@
 
 #include "osal/input_codes.hpp"
 
-namespace mole::inputs {
+namespace mole {
 
 /**
  * @brief Pure abstract interface for querying some IWindow about inputs.
@@ -40,4 +40,4 @@ public:
   virtual void end_frame() noexcept = 0;
 };
 
-} // namespace mole::inputs
+} // mole

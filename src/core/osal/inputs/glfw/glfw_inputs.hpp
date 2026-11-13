@@ -5,16 +5,14 @@
 struct GLFWwindow;
 
 namespace mole {
-class GlfwWindow;
-}
 
-namespace mole::inputs {
+class GlfwWindow;
 
 /**
  * @brief Class for handling GLFW inputs
  */
 class GlfwInputs : public IInputs {
-  friend class ::mole::GlfwWindow;
+  friend class GlfwWindow;
 
 public:
   explicit GlfwInputs() = default;
@@ -75,4 +73,4 @@ private:
   inline void endFrameMouse() noexcept;
 };
 
-} // namespace mole::inputs
+} // namespace mole

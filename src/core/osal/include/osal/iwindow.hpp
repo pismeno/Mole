@@ -8,9 +8,7 @@
 
 namespace mole {
 
-namespace inputs {
 class IInputs;
-}
 
 struct WindowOptions {
   uint32_t logical_width, logical_height;
@@ -53,7 +51,7 @@ public:
   /**
    * @return Inputs object, responsible for handling input events.
    */
-  virtual inputs::IInputs& get_inputs() = 0;
+  virtual IInputs& get_inputs() = 0;
 
   /**
    * @return OS specific handle to the window.
@@ -69,4 +67,4 @@ private:
   virtual Result<void> init() = 0;
 };
 
-} // namespace mole
+} // mole

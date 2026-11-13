@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace mole::inputs {
+namespace mole {
 
 // ==========================================
 // MOUSE BUTTONS
@@ -196,4 +196,4 @@ enum class EKeyCode : uint16_t {
   Menu = 348        // Context Menu Key
 };
 
-} // namespace mole::inputs
+} // mole
