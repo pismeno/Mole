@@ -9,6 +9,7 @@ Mole engine is still in early development, however these are some of the already
 - Vulkan renderer, capable of rendering 2d nodes from Scenes, applying materials to them
 - Generic systems like: file system, asset manager, windowing
 - Material and Asset hot-reloading
+- Scene serde
 
 # Code Examples:
 - [scene.hpp](src/core/node_system/include/node_system/scene.hpp), [scene.cpp](src/core/node_system/scene.cpp)
