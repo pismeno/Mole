@@ -107,3 +107,24 @@ class [[nodiscard]] Result<void> {
 static inline Result<void> ok() { return Result<void>(); }
 static inline Failure fail(std::string error_message) { return Failure{std::move(error_message)}; }
 } // mole
+
+#define MOLE_CONCAT_IMPL(a, b) a##b
+#define MOLE_CONCAT(a, b) MOLE_CONCAT_IMPL(a, b)
+
+#define MOLE_TRY_IMPL(tmp, expr)                      \
+  do {                                                \
+    auto tmp = (expr);                                \
+    if (!tmp.is_ok()) {                               \
+      return ::mole::Failure{std::move(tmp).error()}; \
+    }                                                 \
+  } while (0)
+
+#define MOLE_TRY_ASSIGN_IMPL(tmp, decl, expr)         \
+  auto tmp = (expr);                                  \
+  if (!tmp.is_ok()) {                                 \
+    return ::mole::Failure{std::move(tmp).error()};   \
+  }                                                   \
+  decl = std::move(tmp).value()
+
+#define MOLE_TRY(expr) MOLE_TRY_IMPL(MOLE_CONCAT(_mole_res_, __COUNTER__), expr)
+#define MOLE_TRY_ASSIGN(decl, expr) MOLE_TRY_ASSIGN_IMPL(MOLE_CONCAT(_mole_res_, __COUNTER__), decl, expr)
