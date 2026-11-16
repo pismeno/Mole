@@ -30,11 +30,6 @@ int main() {
     return 1;
   }
 
-  auto r_shutdown = editor->shutdown();
-  if (!r_shutdown) {
-    std::cerr << r_shutdown.error() << std::endl;
-  }
-
   glfwTerminate();
   glslang::FinalizeProcess();
 

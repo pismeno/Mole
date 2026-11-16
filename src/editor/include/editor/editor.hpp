@@ -37,7 +37,6 @@ class Editor {
   static constexpr float PPU = 32.0f; // TODO move into some sort of settings
 
   Result<void> run();
-  Result<void> shutdown();
 
   static Result<std::unique_ptr<Editor>> create();
  private:

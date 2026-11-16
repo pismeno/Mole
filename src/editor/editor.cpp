@@ -11,6 +11,7 @@
 #include "editor/project.hpp"
 #include "editor/project_assets.hpp"
 #include "editor/states/workspace_state.hpp"
+#include "editor/subprocess.hpp"
 #include "node_system/engine_managers.hpp"
 #include "node_system/node_system_context.hpp"
 #include "node_system/render_gatherer.hpp"
@@ -231,16 +232,4 @@ Result<void> Editor::run() {
   return mole::ok();
 }
 
-Result<void> Editor::shutdown() {
-  if (window) {
-    auto window_close_result = window->close();
-    if (!window_close_result) {
-      std::cerr << "Error closing window: " << window_close_result.error() << std::endl;
-    }
-    window.reset();
-  }
-
-  return mole::ok();
-}
-
-} // namespace mole
+} // mole
