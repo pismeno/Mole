@@ -108,9 +108,7 @@ Result<void> Editor::init() {
   scene_factory = std::move(r_create_sf).value();
   node_system_context.scene_factory = scene_factory.get();
 
-  scene_factory->register_manager<TransformManager>();
-  scene_factory->register_manager<DrawableManager>();
-  scene_factory->register_manager<CameraManager>();
+  scene_factory->register_managers<EngineManagers>();
 
   rendering_context = {.resources_context = &resources_context};
 
