@@ -14,8 +14,6 @@ struct EditorContext;
 struct ProjectOptions {
   std::string name;
   std::filesystem::path location;
-
-  const EditorContext& context;
 };
 
 class Project {
