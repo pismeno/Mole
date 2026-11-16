@@ -37,3 +37,7 @@
 [submodule "external/reproc"]
 	path = external/reproc
 	url = https://github.com/daandemeyer/reproc.git
+[submodule "external/imgui"]
+	path = external/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = docking

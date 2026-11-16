@@ -1,3 +1,13 @@
+set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/external/imgui")
+
+add_library(imgui STATIC
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+)
+
 add_executable(MoleEditor)
 
 target_sources(MoleEditor
@@ -27,6 +37,7 @@ target_link_libraries(MoleEditor
         MoleCore
         glfw
         reproc++
+        imgui
 )
 
 target_include_directories(MoleEditor
