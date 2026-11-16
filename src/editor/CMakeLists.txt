@@ -47,6 +47,10 @@ target_include_directories(MoleEditor
         PRIVATE ${CMAKE_SOURCE_DIR}/external/watcher/include
 )
 
+if(WIN32)
+    target_compile_definitions(MoleEditor PRIVATE NOMINMAX)
+endif()
+
 if(APPLE)
     target_link_libraries(MoleEditor
             PRIVATE

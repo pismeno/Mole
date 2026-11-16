@@ -75,7 +75,6 @@ class Editor {
   std::unique_ptr<ManagerReflectorBinderFactory<EngineManagers>> manager_reflector_binder_factory;
 
   std::unique_ptr<IWindow> window;
-  std::unique_ptr<Scene> scene;
   std::unique_ptr<IEditorState> state;
 };
 

@@ -526,6 +526,14 @@ inline void VulkanRenderer::move_to_next_frame() {
 bool VulkanRenderer::is_context_lost() const noexcept { return is_context_lost_; }
 bool VulkanRenderer::needs_framebuffer_resize() const noexcept { return needs_framebuffer_resize_; }
 
+uint32_t VulkanRenderer::get_framebuffer_width() const noexcept {
+  return swapchain ? swapchain->get_extent().width : 0;
+}
+
+uint32_t VulkanRenderer::get_framebuffer_height() const noexcept {
+  return swapchain ? swapchain->get_extent().height : 0;
+}
+
 void VulkanRenderer::build_batches() {
   // 1. Clear GPU-bound structures (clears count, but keeps allocated capacity)
   quads.clear();

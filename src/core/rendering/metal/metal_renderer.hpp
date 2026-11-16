@@ -31,6 +31,9 @@ public:
 
   Result<void> resize_framebuffer(uint32_t width, uint32_t height) override;
 
+  [[nodiscard]] uint32_t get_framebuffer_width() const noexcept override { return 0; }
+  [[nodiscard]] uint32_t get_framebuffer_height() const noexcept override { return 0; }
+
 private:
   void init_device();
 

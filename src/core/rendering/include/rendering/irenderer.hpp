@@ -36,6 +36,9 @@ public:
   virtual bool needs_framebuffer_resize() const noexcept = 0;
   virtual bool is_context_lost() const noexcept = 0;
 
+  [[nodiscard]] virtual uint32_t get_framebuffer_width() const noexcept = 0;
+  [[nodiscard]] virtual uint32_t get_framebuffer_height() const noexcept = 0;
+
   /**
    * @brief Factory method to create the specific implementation
    */

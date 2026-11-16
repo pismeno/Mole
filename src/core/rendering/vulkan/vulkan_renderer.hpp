@@ -34,7 +34,7 @@ class VulkanSwapchain;
 struct RenderingContext;
 
 class VulkanRenderer : public IRenderer {
- public:
+public:
   ~VulkanRenderer();
 
   static constexpr inline uint32_t MAX_FRAMES_IN_FLIGHT = 2;
@@ -51,8 +51,13 @@ class VulkanRenderer : public IRenderer {
   bool needs_framebuffer_resize() const noexcept override;
   bool is_context_lost() const noexcept override;
 
-  static Result<std::unique_ptr<VulkanRenderer>> create(RenderingContext& context, void* native_window_handle, uint32_t window_width, uint32_t window_height);
- private:
+  [[nodiscard]] uint32_t get_framebuffer_width() const noexcept override;
+  [[nodiscard]] uint32_t get_framebuffer_height() const noexcept override;
+
+  static Result<std::unique_ptr<VulkanRenderer>> create(RenderingContext& context, void* native_window_handle,
+                                                        uint32_t window_width, uint32_t window_height);
+
+private:
   explicit VulkanRenderer() = default;
 
   struct FrameData {
@@ -78,15 +83,10 @@ class VulkanRenderer : public IRenderer {
   void update_quad_ssbo(FrameData& frame);
   inline void move_to_next_frame();
 
-  void transition_image_layout(
-      vk::raii::CommandBuffer& cmd_buffer,
-      vk::Image                image,
-      vk::ImageLayout         old_layout,
-      vk::ImageLayout         new_layout,
-      vk::AccessFlags2        src_access_mask,
-      vk::AccessFlags2        dst_access_mask,
-      vk::PipelineStageFlags2 src_stage_mask,
-      vk::PipelineStageFlags2 dst_stage_mask);
+  void transition_image_layout(vk::raii::CommandBuffer& cmd_buffer, vk::Image image, vk::ImageLayout old_layout,
+                               vk::ImageLayout new_layout, vk::AccessFlags2 src_access_mask,
+                               vk::AccessFlags2 dst_access_mask, vk::PipelineStageFlags2 src_stage_mask,
+                               vk::PipelineStageFlags2 dst_stage_mask);
 
   std::unique_ptr<Counter> frames_rendered;
   std::unique_ptr<VulkanContext> vk_context;
@@ -122,4 +122,4 @@ class VulkanRenderer : public IRenderer {
   std::vector<MaterialID> get_needed_pass_materials();
 };
 
-} // mole
+} // namespace mole

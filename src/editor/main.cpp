@@ -1,6 +1,7 @@
 #include <iostream>
 #include <memory>
 
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <glslang/Public/ShaderLang.h>
 
@@ -33,6 +34,9 @@ int main() {
   if (!r_shutdown) {
     std::cerr << r_shutdown.error() << std::endl;
   }
+
+  glfwTerminate();
+  glslang::FinalizeProcess();
 
   return 0;
 }
