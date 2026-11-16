@@ -21,6 +21,7 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/states/ieditor_state.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/states/workspace_state.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/process_orchestrator.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/project_asset_pipeline.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/editor.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
@@ -30,6 +31,7 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/subprocess.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/states/workspace_state.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/process_orchestrator.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/project_asset_pipeline.cpp
 )
 
 target_link_libraries(MoleEditor
