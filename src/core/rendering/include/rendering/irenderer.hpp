@@ -39,7 +39,7 @@ public:
   /**
    * @brief Factory method to create the specific implementation
    */
-  static Result<std::unique_ptr<IRenderer>> create(RendererOptions options, RenderingContext& context);
+  static Result<std::unique_ptr<IRenderer>> create(const RendererOptions& options, RenderingContext& context);
 };
 
 } // namespace mole

@@ -28,7 +28,7 @@
 #include "node_system/scene.hpp"
 #include "node_system/scene_factory.hpp"
 #include "osal/ifile_system.hpp"
-#include "osal/inputs.hpp"
+#include "osal/iinputs.hpp"
 #include "osal/iwindow.hpp"
 #include "osal/os_context.hpp"
 #include "rendering/bindless_texture_registry.hpp"
@@ -136,8 +136,12 @@ Result<void> Editor::init() {
       .process_orchestrator = process_orchestrator.get(),
   };
 
-  RendererOptions renderer_options{ERendererType::Vulkan, window->get_native_handle(), window->get_framebuffer_width(),
-                                   window->get_framebuffer_height()};
+  RendererOptions renderer_options{
+    ERendererType::Vulkan, 
+    window->get_native_handle(), 
+    window->get_framebuffer_width(),
+    window->get_framebuffer_height()
+  };
 
   auto renderer_result = IRenderer::create(renderer_options, rendering_context);
   if (!renderer_result) {
