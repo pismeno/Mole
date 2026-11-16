@@ -7,6 +7,7 @@
 #include <thread>
 #include <utility>
 #include "resources/material_types.hpp"
+#include "utils/result.hpp"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -52,49 +53,72 @@ namespace mole {
 
 Editor::Editor() = default;
 Editor::~Editor() = default;
+  
+Result<std::unique_ptr<Editor>> Editor::create() {
+  auto editor = std::unique_ptr<Editor>(new Editor());
+  
+  MOLE_TRY(editor->init_os_context());
+  MOLE_TRY(editor->create_window());
+  editor->mount_paths();
 
-Result<void> Editor::init() {
-  auto r_create_file_system = IFileSystem::create();
-  if (!r_create_file_system) {
-    return mole::fail(r_create_file_system.error());
-  }
-  file_system = std::move(r_create_file_system).value();
+  MOLE_TRY(editor->init_resources_context());
+  MOLE_TRY(editor->init_node_system_context());
+  MOLE_TRY(editor->init_rendering_context());
+  MOLE_TRY(editor->init_editor_context());
+  
+  editor->scene_factory->register_managers<EngineManagers>();
 
+  MOLE_TRY(editor->load_workspace());
+
+  return editor;
+}
+
+Result<void> Editor::create_window() {
+  WindowOptions window_options = {
+    .logical_width = 800, 
+    .logical_height = 600, 
+    .title = "Mole Editor"
+  };
+  
+  MOLE_TRY_ASSIGN(window, IWindow::create(window_options));
+
+  return mole::ok();
+}
+
+void Editor::mount_paths() {
   auto r_mount_core = file_system->mount_from_virtual("core", "exe://engine_data/core");
   assert(r_mount_core && "'exe://' should be mounted when creating filesystem");
   auto r_mount_editor = file_system->mount_from_virtual("editor", "exe://engine_data/editor");
   assert(r_mount_editor && "'exe://' should be mounted when creating filesystem");
+}
 
-  glslang::InitializeProcess();
+Result<void> Editor::init_os_context() {
+  MOLE_TRY_ASSIGN(file_system, IFileSystem::create());
+  
+  os_context = {
+    .file_system = file_system.get()
+  };
+  
+  return mole::ok();
+}
 
-  if (!glfwInit()) {
-    return mole::fail("Failed to initialize GLFW");
-  }
-
-  auto window_result = IWindow::create(WindowOptions{800, 600, "Mole Editor"});
-  if (!window_result) {
-    glfwTerminate();
-    return mole::fail(window_result.error());
-  }
-  window = std::move(window_result).value();
-
-  os_context = {.file_system = file_system.get()};
-
+Result<void> Editor::init_resources_context() {
   resources_context = {
       .os_context = &os_context,
   };
 
-  auto r_create_am = AssetManager::create(resources_context);
-  if (!r_create_am) {
-    return mole::fail(r_create_am.error());
-  }
-  asset_manager = std::move(r_create_am).value();
+  MOLE_TRY_ASSIGN(asset_manager, AssetManager::create(resources_context));
   resources_context.asset_manager = asset_manager.get();
 
   material_pool = std::make_unique<MaterialPool>(resources_context);
   resources_context.material_pool = material_pool.get();
 
   render_gatherer = std::make_unique<RenderGatherer>();
+
+  return mole::ok();
+}
+
+Result<void> Editor::init_node_system_context() {
   manager_reflector_binder_factory = std::make_unique<ManagerReflectorBinderFactory<EngineManagers>>();
 
   node_system_context = {
@@ -103,57 +127,56 @@ Result<void> Editor::init() {
       .manager_reflector_binder_factory = manager_reflector_binder_factory.get(),
   };
 
-  auto r_create_sf = SceneFactory::create(node_system_context);
-  if (!r_create_sf) return mole::fail(r_create_sf.error());
-  scene_factory = std::move(r_create_sf).value();
+  MOLE_TRY_ASSIGN(scene_factory, SceneFactory::create(node_system_context));
   node_system_context.scene_factory = scene_factory.get();
 
-  scene_factory->register_managers<EngineManagers>();
+  return mole::ok();
+}
 
-  rendering_context = {.resources_context = &resources_context};
+Result<void> Editor::init_rendering_context() {
+  rendering_context = {
+    .resources_context = &resources_context
+  };
 
   bindless_texture_registry = std::make_unique<BindlessTextureRegistry>();
   rendering_context.bindless_texture_registry = bindless_texture_registry.get();
+  
   material_shader_layout_reflector = std::make_unique<MaterialShaderLayoutReflector>();
   rendering_context.material_shader_layout_reflector = material_shader_layout_reflector.get();
+  
   material_shader_layout_registry = std::make_unique<MaterialShaderLayoutRegistry>(rendering_context);
   rendering_context.material_shader_layout_registry = material_shader_layout_registry.get();
+  
   material_packer = std::make_unique<MaterialPacker>(rendering_context);
   rendering_context.material_packer = material_packer.get();
+  
   packed_material_cache = std::make_unique<PackedMaterialCache>(rendering_context);
   rendering_context.packed_material_cache = packed_material_cache.get();
 
+  RendererOptions renderer_options{
+    .type = ERendererType::Vulkan, 
+    .native_window_handle = window->get_native_handle(), 
+    .window_width = window->get_framebuffer_width(),
+    .window_height = window->get_framebuffer_height()
+  };
+
+  MOLE_TRY_ASSIGN(renderer, IRenderer::create(renderer_options, rendering_context));
+  rendering_context.renderer = renderer.get();
+
+  return mole::ok();
+}
+
+Result<void> Editor::init_editor_context() {
   process_orchestrator = std::make_unique<ProcessOrchestrator>();
 
   context = {
-      .node_system_context = &node_system_context,
-      .rendering_context = &rendering_context,
-      .os_context = &os_context,
-      .resources_context = &resources_context,
+    .node_system_context = &node_system_context,
+    .rendering_context = &rendering_context,
+    .os_context = &os_context,
+    .resources_context = &resources_context,
 
-      .process_orchestrator = process_orchestrator.get(),
+    .process_orchestrator = process_orchestrator.get(),
   };
-
-  RendererOptions renderer_options{
-    ERendererType::Vulkan, 
-    window->get_native_handle(), 
-    window->get_framebuffer_width(),
-    window->get_framebuffer_height()
-  };
-
-  auto renderer_result = IRenderer::create(renderer_options, rendering_context);
-  if (!renderer_result) {
-    return mole::fail(renderer_result.error());
-  }
-
-  renderer = std::move(renderer_result).value();
-  rendering_context.renderer = renderer.get();
-
-  // Instantly load the workspace during initialization
-  auto r_load = load_workspace();
-  if (!r_load) {
-    return mole::fail("Failed to load workspace: " + r_load.error());
-  }
 
   return mole::ok();
 }
@@ -161,10 +184,13 @@ Result<void> Editor::init() {
 Result<void> Editor::load_workspace() {
   std::cout << "Loading workspace..." << std::endl;
 
-  auto r_create_project = Project::create({"test_project", "test_project", context});
-  if (!r_create_project) return mole::fail(r_create_project.error());
-  std::unique_ptr<Project> project = std::move(r_create_project).value();
-
+  ProjectOptions project_options = {
+    .name = "test_project",
+    .location = "test_project"
+  };
+  
+  MOLE_TRY_ASSIGN(auto project, Project::create(project_options));
+  
   auto r_create_state = WorkspaceState::create(std::move(project), context);
   if (!r_create_state) return mole::fail(r_create_state.error());
   WorkspaceState* workspace_state = r_create_state.value().get();
@@ -190,10 +216,6 @@ Result<void> Editor::load_workspace() {
   auto r_scene = scene_factory->create_scene("scene_2d");
   if (!r_scene) return mole::fail(r_scene.error());
   scene = std::move(r_scene).value();
-
-  auto* transform_manager = scene->get_manager<TransformManager>();
-  auto* drawable_manager = scene->get_manager<DrawableManager>();
-  auto* camera_manager = scene->get_manager<CameraManager>();
   
   auto r_uuid = workspace_state->get_project_assets().resolve("scene.scene.json", EAssetType::Scene);
   if (!r_uuid) return mole::fail(r_uuid.error());
@@ -360,4 +382,4 @@ Result<void> Editor::shutdown() {
   return mole::ok();
 }
 
-} // namespace mole
+} // mole

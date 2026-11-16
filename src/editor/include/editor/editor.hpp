@@ -32,16 +32,26 @@ class SceneFactory;
 
 class Editor {
  public:
+  ~Editor();
+   
   static constexpr float PPU = 32.0f; // TODO move into some sort of settings
 
-  explicit Editor();
-  ~Editor();
-
-  Result<void> init();
   Result<void> run();
   Result<void> shutdown();
 
+  static Result<std::unique_ptr<Editor>> create();
  private:
+  explicit Editor();
+
+  void mount_paths();
+  Result<void> create_window();
+
+  Result<void> init_os_context();
+  Result<void> init_resources_context();
+  Result<void> init_rendering_context();
+  Result<void> init_node_system_context();
+  Result<void> init_editor_context();
+   
   Result<void> load_workspace();
 
   EditorContext context;
