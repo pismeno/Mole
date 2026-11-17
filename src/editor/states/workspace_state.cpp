@@ -103,9 +103,7 @@ void WorkspaceState::update() {
 }
 
 void WorkspaceState::render(IRenderer* renderer) {
-  ViewData view_data = calculate_view_data(renderer);
-
-  renderer->begin_pass(view_data);
+  renderer->begin_pass(calculate_view_data(renderer));
   if (scene) renderer->submit(render_gatherer->gather_render_commands(*scene));
   renderer->end_pass();
 }
@@ -123,69 +121,60 @@ Result<void> WorkspaceState::load_scene(std::string_view path) {
 }
 
 ViewData WorkspaceState::calculate_view_data(IRenderer* renderer) {
-  float width = 800.0f;
-  float height = 600.0f;
-  if (renderer) {
-    width = static_cast<float>(renderer->get_framebuffer_width());
-    height = static_cast<float>((std::max)(1u, renderer->get_framebuffer_height()));
-  }
+  float width = static_cast<float>(renderer->get_framebuffer_width());
+  float height = static_cast<float>((std::max)(1u, renderer->get_framebuffer_height()));
+  
   return calculate_view_data(width, height);
 }
 
 ViewData WorkspaceState::calculate_view_data(float width, float height) {
   ViewData view_data{};
 
-  // --- CAMERA CALCULATION ---
-  if (scene) {
-    auto* camera_manager = scene->get_manager<CameraManager>();
-    auto* transform_manager = scene->get_manager<TransformManager>();
-    (void)transform_manager;
+  if (!scene) return view_data;
+  
+  auto* camera_manager = scene->get_manager<CameraManager>();
+  auto* transform_manager = scene->get_manager<TransformManager>();
+  (void)transform_manager;
 
-    NodeID active_cam = camera_manager->get_active_camera_node();
-    if (active_cam != NodeID::INVALID) {
-      auto r_cam = camera_manager->get_camera(active_cam);
-      if (r_cam) {
-        Camera cam = r_cam.value();
-
-        // Dynamically adjust aspect ratio based on window size
-        cam.aspect_ratio = width / height;
-        auto r_set_cam = camera_manager->set_camera(active_cam, cam); // Write it back
-        (void)r_set_cam;
-
-        float half_h = (cam.size / cam.zoom) * 0.5f;
-        float half_w = half_h * cam.aspect_ratio;
-
-        // Vulkan projection (orthoZO), Y-axis swap applied via half_h parameters
-        view_data.projection = glm::orthoZO(-half_w, half_w, half_h, -half_h, cam.near_plane, cam.far_plane);
-
-        glm::mat4 view = glm::mat4(1.0f);
-
-        // Retrieve position from transform manager if implemented
-        glm::vec2 cam_pos{0.0f, 0.0f};
-        // Note: Adjust the exact getter name based on your TransformManager implementation
-        // if (auto r_pos = transform_manager->get_node_position(active_cam)) cam_pos = r_pos.value();
-
-        // Transform logic (Rotation would go here if needed)
-        view = glm::translate(view, glm::vec3(-cam_pos.x, -cam_pos.y, 0.0f));
-
-        view_data.view = view;
-        view_data.viewProjection = view_data.projection * view_data.view;
-      }
-    } else {
-      // Fallback if scene is loaded but no camera is active
-      float world_width = width / PPU;
-      float world_height = height / PPU;
-      view_data.projection = glm::ortho(0.0f, world_width, world_height, 0.0f, -1.0f, 1.0f);
-      view_data.view = glm::mat4(1.0f);
-      view_data.viewProjection = view_data.projection * view_data.view;
-    }
-  } else {
-    // Fallback before the workspace is loaded via 'L' (removed, but kept for safety)
-    view_data.projection = glm::mat4(1.0f);
+  NodeID active_cam = camera_manager->get_active_camera_node();
+  if (active_cam == NodeID::INVALID) {
+    float world_width = width / PPU;
+    float world_height = height / PPU;
+    view_data.projection = glm::ortho(0.0f, world_width, world_height, 0.0f, -1.0f, 1.0f);
     view_data.view = glm::mat4(1.0f);
     view_data.viewProjection = view_data.projection * view_data.view;
+
+    return view_data;
   }
-  // --------------------------
+  auto r_cam = camera_manager->get_camera(active_cam);
+  
+  if (!r_cam) return view_data;
+  
+  Camera cam = r_cam.value();
+
+  // Dynamically adjust aspect ratio based on window size
+  cam.aspect_ratio = width / height;
+  auto r_set_cam = camera_manager->set_camera(active_cam, cam); // Write it back
+  (void)r_set_cam;
+
+  float half_h = (cam.size / cam.zoom) * 0.5f;
+  float half_w = half_h * cam.aspect_ratio;
+
+  // Vulkan projection (orthoZO), Y-axis swap applied via half_h parameters
+  view_data.projection = glm::orthoZO(-half_w, half_w, half_h, -half_h, cam.near_plane, cam.far_plane);
+
+  glm::mat4 view = glm::mat4(1.0f);
+
+  // Retrieve position from transform manager if implemented
+  glm::vec2 cam_pos{0.0f, 0.0f};
+  // Note: Adjust the exact getter name based on your TransformManager implementation
+  // if (auto r_pos = transform_manager->get_node_position(active_cam)) cam_pos = r_pos.value();
+
+  // Transform logic (Rotation would go here if needed)
+  view = glm::translate(view, glm::vec3(-cam_pos.x, -cam_pos.y, 0.0f));
+
+  view_data.view = view;
+  view_data.viewProjection = view_data.projection * view_data.view;
 
   return view_data;
 }
