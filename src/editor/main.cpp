@@ -15,6 +15,7 @@ int main() {
 
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW" << std::endl;
+    return 1;
   }
   
   auto r_create_editor = Editor::create();
