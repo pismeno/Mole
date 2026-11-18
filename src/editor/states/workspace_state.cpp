@@ -75,22 +75,14 @@ Result<std::unique_ptr<WorkspaceState>> WorkspaceState::create(std::unique_ptr<P
 
   context.process_orchestrator->flush_and_wait(); // wait for asset sync before continuing
 
-  auto r_res_uuid = state->project_assets->resolve("scene_definitions.json", EAssetType::Text); // TODO remove ties to workspace/project
-  if (!r_res_uuid) return mole::fail(r_res_uuid.error());
-  auto r_get_scene_defs = state->asset_manager->acquire<TextAsset>(r_res_uuid.value());
-  if (!r_get_scene_defs) return mole::fail(r_get_scene_defs.error());
-  AssetHandle<TextAsset> scene_defs = std::move(r_get_scene_defs).value();
+  MOLE_TRY_ASSIGN(UUID scene_defs_uuid, state->project_assets->resolve("scene_definitions.json", EAssetType::Text)); // TODO remove ties to workspace/project
+  MOLE_TRY_ASSIGN(AssetHandle<TextAsset> scene_defs, state->asset_manager->acquire<TextAsset>(scene_defs_uuid));
 
-  r_res_uuid = state->project_assets->resolve("node_definitions.json", EAssetType::Text); // TODO remove ties to workspace/project
-  if (!r_res_uuid) return mole::fail(r_res_uuid.error());
-  auto r_get_node_defs = state->asset_manager->acquire<TextAsset>(r_res_uuid.value());
-  if (!r_get_node_defs) return mole::fail(r_get_node_defs.error());
-  AssetHandle<TextAsset> node_defs = std::move(r_get_node_defs).value();
+  MOLE_TRY_ASSIGN(UUID node_defs_uuid, state->project_assets->resolve("node_definitions.json", EAssetType::Text)); // TODO remove ties to workspace/project
+  MOLE_TRY_ASSIGN(AssetHandle<TextAsset> node_defs, state->asset_manager->acquire<TextAsset>(node_defs_uuid));
 
-  auto r_load_scene_defs = state->scene_factory->load_scene_definitions_from(scene_defs->as_string_view());
-  if (!r_load_scene_defs) return mole::fail(r_load_scene_defs.error());
-  auto r_load_node_defs = state->scene_factory->load_node_definitions_from(node_defs->as_string_view());
-  if (!r_load_node_defs) return mole::fail(r_load_node_defs.error());
+  MOLE_TRY(state->scene_factory->load_scene_definitions_from(scene_defs->as_string_view()));
+  MOLE_TRY(state->scene_factory->load_node_definitions_from(node_defs->as_string_view()));
 
   MOLE_TRY(state->load_scene("scene.scene.json")); // TODO get current scene from some project_manifest.json
 
