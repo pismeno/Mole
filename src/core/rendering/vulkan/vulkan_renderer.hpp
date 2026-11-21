@@ -57,7 +57,8 @@ public:
   [[nodiscard]] void* get_native_handle(ERendererNativeHandle handle_type) const override;
   [[nodiscard]] RendererBackendInfo get_backend_info() const override;
 
-  static Result<std::unique_ptr<VulkanRenderer>> create(RenderingContext& context, void* native_window_handle, uint32_t window_width, uint32_t window_height);
+  static Result<std::unique_ptr<VulkanRenderer>> create(RenderingContext& context, void* native_window_handle,
+                                                        uint32_t window_width, uint32_t window_height);
 
 private:
   explicit VulkanRenderer() = default;
@@ -111,6 +112,7 @@ private:
   uint32_t current_image_index_ = 0;
   uint32_t current_frame_ = 0;
   ViewData current_view_data_;
+  void* native_window_handle_ = nullptr;
 
   // mole systems
   AssetManager* asset_manager = nullptr;
@@ -124,4 +126,4 @@ private:
   std::vector<MaterialID> get_needed_pass_materials();
 };
 
-} // mole
+} // namespace mole

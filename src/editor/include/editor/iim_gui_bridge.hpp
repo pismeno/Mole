@@ -9,6 +9,7 @@ namespace mole {
 
 struct ImGuiBridgeOptions {
   ERendererType renderer_type;
+  void* native_window_handle;
 };
 
 struct EditorContext;

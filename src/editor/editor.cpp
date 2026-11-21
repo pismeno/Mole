@@ -6,7 +6,10 @@
 #include <thread>
 #include <utility>
 
+#include <imgui.h>
+
 #include "editor/editor_context.hpp"
+#include "editor/iim_gui_bridge.hpp"
 #include "editor/process_orchestrator.hpp"
 #include "editor/project.hpp"
 #include "editor/project_assets.hpp"
@@ -30,8 +33,8 @@
 #include "resources/asset_manager.hpp"
 #include "resources/material.hpp"
 #include "resources/material_pool.hpp"
-#include "resources/resources_context.hpp"
 #include "resources/material_types.hpp"
+#include "resources/resources_context.hpp"
 #include "utils/result.hpp"
 
 namespace mole {
@@ -50,6 +53,7 @@ Result<std::unique_ptr<Editor>> Editor::create() {
   MOLE_TRY(editor->init_node_system_context());
   MOLE_TRY(editor->init_rendering_context());
   MOLE_TRY(editor->init_editor_context());
+  MOLE_TRY(editor->init_imgui());
 
   editor->scene_factory->register_managers<EngineManagers>();
 
@@ -158,6 +162,17 @@ Result<void> Editor::init_editor_context() {
   return mole::ok();
 }
 
+Result<void> Editor::init_imgui() {
+  ImGuiBridgeOptions bridge_options{
+    .renderer_type = ERendererType::Vulkan,
+    .native_window_handle = window->get_native_handle()
+  };
+
+  MOLE_TRY_ASSIGN(imgui_bridge, IImGuiBridge::create(bridge_options, context));
+
+  return mole::ok();
+}
+
 Result<void> Editor::load_workspace() {
   std::cout << "Loading workspace..." << std::endl;
 
@@ -204,10 +219,23 @@ Result<void> Editor::run() {
     }
 
     state->update();
-    
+
+    imgui_bridge->begin_frame();
+
+    ImGui::Begin("Hello, World!");
+    ImGui::Text("Hello, World from Mole Editor!");
+    static int counter = 0;
+    if (ImGui::Button("Click Me!")) {
+      counter++;
+    }
+    ImGui::Text("Button clicked %d times", counter);
+    ImGui::End();
+
     renderer->begin_frame();
 
     state->render(renderer.get());
+
+    imgui_bridge->end_frame();
 
     renderer->end_frame();
 

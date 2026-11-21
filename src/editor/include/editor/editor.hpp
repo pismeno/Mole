@@ -2,9 +2,9 @@
 
 #include <memory>
 
+#include "editor/editor_context.hpp"
 #include "node_system/engine_managers.hpp"
 #include "node_system/manager_reflector_binder_factory.hpp"
-#include "editor/editor_context.hpp"
 #include "node_system/node_system_context.hpp"
 #include "node_system/node_types.hpp"
 #include "osal/os_context.hpp"
@@ -18,6 +18,7 @@ class AssetManager;
 class BindlessTextureRegistry;
 class IEditorState;
 class IFileSystem;
+class IImGuiBridge;
 class IRenderer;
 class IWindow;
 class MaterialPacker;
@@ -31,15 +32,16 @@ class Scene;
 class SceneFactory;
 
 class Editor {
- public:
+public:
   ~Editor();
-   
+
   static constexpr float PPU = 32.0f; // TODO move into some sort of settings
 
   Result<void> run();
 
   static Result<std::unique_ptr<Editor>> create();
- private:
+
+private:
   explicit Editor();
 
   void mount_paths();
@@ -50,7 +52,8 @@ class Editor {
   Result<void> init_rendering_context();
   Result<void> init_node_system_context();
   Result<void> init_editor_context();
-   
+  Result<void> init_imgui();
+
   Result<void> load_workspace();
 
   EditorContext context;
@@ -75,6 +78,7 @@ class Editor {
 
   std::unique_ptr<IWindow> window;
   std::unique_ptr<IEditorState> state;
+  std::unique_ptr<IImGuiBridge> imgui_bridge;
 };
 
 } // mole

@@ -8,6 +8,11 @@ add_library(imgui STATIC
     ${IMGUI_DIR}/imgui_widgets.cpp
 )
 
+target_include_directories(imgui PUBLIC
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backends
+)
+
 add_executable(MoleEditor)
 
 target_sources(MoleEditor
@@ -33,6 +38,7 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/states/workspace_state.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/process_orchestrator.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/project_asset_pipeline.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/iim_gui_bridge.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/im_gui_bridge/win32_vulkan_im_gui_bridge.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/im_gui_bridge/win32_vulkan_im_gui_bridge.hpp
 )
@@ -51,10 +57,15 @@ target_include_directories(MoleEditor
 )
 
 if(WIN32)
-    target_compile_definitions(MoleEditor PRIVATE NOMINMAX)
+    target_compile_definitions(MoleEditor PRIVATE NOMINMAX MOLE_PLATFORM_WINDOWS)
+    target_sources(MoleEditor PRIVATE
+        ${IMGUI_DIR}/backends/imgui_impl_win32.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+    )
 endif()
 
 if(APPLE)
+    target_compile_definitions(MoleEditor PRIVATE MOLE_PLATFORM_APPLE)
     target_link_libraries(MoleEditor
             PRIVATE
             "-framework Cocoa"
