@@ -54,8 +54,10 @@ public:
   [[nodiscard]] uint32_t get_framebuffer_width() const noexcept override;
   [[nodiscard]] uint32_t get_framebuffer_height() const noexcept override;
 
-  static Result<std::unique_ptr<VulkanRenderer>> create(RenderingContext& context, void* native_window_handle,
-                                                        uint32_t window_width, uint32_t window_height);
+  [[nodiscard]] void* get_native_handle(ERendererNativeHandle handle_type) const override;
+  [[nodiscard]] RendererBackendInfo get_backend_info() const override;
+
+  static Result<std::unique_ptr<VulkanRenderer>> create(RenderingContext& context, void* native_window_handle, uint32_t window_width, uint32_t window_height);
 
 private:
   explicit VulkanRenderer() = default;
@@ -122,4 +124,4 @@ private:
   std::vector<MaterialID> get_needed_pass_materials();
 };
 
-} // namespace mole
+} // mole

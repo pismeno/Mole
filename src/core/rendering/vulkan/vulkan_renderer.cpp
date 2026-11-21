@@ -8,6 +8,7 @@
 #include <memory>
 #include <optional>
 #include <ranges>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -34,6 +35,19 @@
 #include "utils/result.hpp"
 
 namespace mole {
+
+namespace {
+
+template <typename T>
+void* to_native_handle_ptr(T handle) {
+  if constexpr (std::is_pointer_v<T>) {
+    return const_cast<void*>(static_cast<const void*>(handle));
+  } else {
+    return reinterpret_cast<void*>(static_cast<uintptr_t>(handle));
+  }
+}
+
+} // namespace
 
 VulkanRenderer::~VulkanRenderer() {
   if (!is_context_lost_ && vk_context) {
@@ -532,6 +546,46 @@ uint32_t VulkanRenderer::get_framebuffer_width() const noexcept {
 
 uint32_t VulkanRenderer::get_framebuffer_height() const noexcept {
   return swapchain ? swapchain->get_extent().height : 0;
+}
+
+void* VulkanRenderer::get_native_handle(ERendererNativeHandle handle_type) const {
+  switch (handle_type) {
+    case ERendererNativeHandle::Instance:
+      return to_native_handle_ptr(static_cast<VkInstance>(*vk_context->get_instance()));
+    case ERendererNativeHandle::PhysicalAdapter:
+      return to_native_handle_ptr(static_cast<VkPhysicalDevice>(*vk_context->get_physical_device()));
+    case ERendererNativeHandle::Device:
+      return to_native_handle_ptr(static_cast<VkDevice>(*vk_context->get_logical_device()));
+    case ERendererNativeHandle::ImmediateContext:
+      return nullptr;
+    case ERendererNativeHandle::GraphicsQueue:
+      return to_native_handle_ptr(static_cast<VkQueue>(*vk_context->get_graphics_queue()));
+    case ERendererNativeHandle::ComputeQueue:
+      return to_native_handle_ptr(static_cast<VkQueue>(*vk_context->get_graphics_queue()));
+    case ERendererNativeHandle::TransferQueue:
+      return to_native_handle_ptr(static_cast<VkQueue>(*vk_context->get_graphics_queue()));
+    case ERendererNativeHandle::Swapchain:
+      return to_native_handle_ptr(static_cast<VkSwapchainKHR>(*swapchain->get_swapchain()));
+    case ERendererNativeHandle::ActiveCommandBuffer:
+      assert(current_frame_ < frames.size());
+      return to_native_handle_ptr(static_cast<VkCommandBuffer>(*frames[current_frame_].command_buffer));
+    default:
+      return nullptr;
+  }
+}
+
+RendererBackendInfo VulkanRenderer::get_backend_info() const {
+  const uint32_t queue_family = vk_context->get_graphics_queue_index();
+  
+  RendererBackendInfo info{
+    .graphics_queue_family = queue_family,
+    .compute_queue_family  = queue_family,
+    .transfer_queue_family = queue_family,
+    .swapchain_image_count = static_cast<uint32_t>(swapchain->get_image_count()),
+    .native_swapchain_format = static_cast<uint32_t>(swapchain->get_surface_format().format)
+  };
+  
+  return info;
 }
 
 void VulkanRenderer::build_batches() {

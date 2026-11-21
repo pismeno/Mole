@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "editor/editor_context.hpp"
@@ -159,8 +160,6 @@ ViewData WorkspaceState::calculate_view_data(float width, float height) {
 
   // Retrieve position from transform manager if implemented
   glm::vec2 cam_pos{0.0f, 0.0f};
-  // Note: Adjust the exact getter name based on your TransformManager implementation
-  // if (auto r_pos = transform_manager->get_node_position(active_cam)) cam_pos = r_pos.value();
 
   // Transform logic (Rotation would go here if needed)
   view = glm::translate(view, glm::vec3(-cam_pos.x, -cam_pos.y, 0.0f));

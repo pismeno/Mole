@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "rendering/renderer_types.hpp"
 #include "resources/render_commands.hpp"
 #include "resources/view_data.hpp"
 #include "utils/result.hpp"
@@ -11,8 +12,6 @@
 namespace mole {
 
 struct RenderingContext;
-
-enum class ERendererType { Metal, Vulkan, DirectX };
 
 struct RendererOptions {
   ERendererType type;
@@ -39,10 +38,16 @@ public:
   [[nodiscard]] virtual uint32_t get_framebuffer_width() const noexcept = 0;
   [[nodiscard]] virtual uint32_t get_framebuffer_height() const noexcept = 0;
 
+  virtual void* get_native_handle(ERendererNativeHandle handle_type) const = 0;
+  virtual RendererBackendInfo get_backend_info() const = 0;
+
+  template <typename T>
+  T get_native_handle(ERendererNativeHandle handle_type) const { return reinterpret_cast<T>(get_native_handle(handle_type)); }
+
   /**
    * @brief Factory method to create the specific implementation
    */
   static Result<std::unique_ptr<IRenderer>> create(const RendererOptions& options, RenderingContext& context);
 };
 
-} // namespace mole
+} // mole
