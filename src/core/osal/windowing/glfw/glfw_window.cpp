@@ -28,7 +28,9 @@ GlfwWindow::GlfwWindow(const WindowOptions& options)
       glfw_window(nullptr),
       is_fullscreen_(options.start_fullscreen) {}
 
-GlfwWindow::~GlfwWindow() = default;
+GlfwWindow::~GlfwWindow() {
+  glfwDestroyWindow(glfw_window);
+}
 
 Result<void> GlfwWindow::init() {
   glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);
@@ -80,11 +82,6 @@ void GlfwWindow::update() {
 
   glfwPollEvents();
   glfwSwapBuffers(glfw_window);
-}
-
-Result<void> GlfwWindow::close() {
-  glfwDestroyWindow(glfw_window);
-  return mole::ok();
 }
 
 bool GlfwWindow::should_close() const noexcept {

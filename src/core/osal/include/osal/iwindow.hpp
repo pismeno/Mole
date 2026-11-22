@@ -29,11 +29,6 @@ public:
   virtual void update() = 0;
 
   /**
-   * @brief Closes the window.
-   */
-  virtual Result<void> close() = 0;
-
-  /**
    * @brief Returns true if the window should be closed (for example when the windows X button is pressed).
    * Should be checked every frame.
    */

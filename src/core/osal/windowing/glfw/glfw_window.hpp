@@ -21,7 +21,6 @@ public:
 
   Result<void> init() override;
   void update() override;
-  Result<void> close() override;
   bool should_close() const noexcept override;
   uint32_t get_logical_width() const override;
   uint32_t get_logical_height() const override;

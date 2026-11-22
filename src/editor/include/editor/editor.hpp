@@ -2,9 +2,9 @@
 
 #include <memory>
 
+#include "editor/editor_context.hpp"
 #include "node_system/engine_managers.hpp"
 #include "node_system/manager_reflector_binder_factory.hpp"
-#include "editor/editor_context.hpp"
 #include "node_system/node_system_context.hpp"
 #include "node_system/node_types.hpp"
 #include "osal/os_context.hpp"
@@ -18,6 +18,7 @@ class AssetManager;
 class BindlessTextureRegistry;
 class IEditorState;
 class IFileSystem;
+class IImGuiBridge;
 class IRenderer;
 class IWindow;
 class MaterialPacker;
@@ -31,17 +32,28 @@ class Scene;
 class SceneFactory;
 
 class Editor {
- public:
-  static constexpr float PPU = 32.0f; // TODO move into some sort of settings
-
-  explicit Editor();
+public:
   ~Editor();
 
-  Result<void> init();
-  Result<void> run();
-  Result<void> shutdown();
+  static constexpr float PPU = 32.0f; // TODO move into some sort of settings
 
- private:
+  Result<void> run();
+
+  static Result<std::unique_ptr<Editor>> create();
+
+private:
+  explicit Editor();
+
+  void mount_paths();
+  Result<void> create_window();
+
+  Result<void> init_os_context();
+  Result<void> init_resources_context();
+  Result<void> init_rendering_context();
+  Result<void> init_node_system_context();
+  Result<void> init_editor_context();
+  Result<void> init_imgui();
+
   Result<void> load_workspace();
 
   EditorContext context;
@@ -65,8 +77,8 @@ class Editor {
   std::unique_ptr<ManagerReflectorBinderFactory<EngineManagers>> manager_reflector_binder_factory;
 
   std::unique_ptr<IWindow> window;
-  std::unique_ptr<Scene> scene;
   std::unique_ptr<IEditorState> state;
+  std::unique_ptr<IImGuiBridge> im_gui_bridge;
 };
 
 } // mole

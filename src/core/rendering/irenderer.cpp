@@ -14,7 +14,7 @@
 
 namespace mole {
 
-Result<std::unique_ptr<IRenderer>> IRenderer::create(RendererOptions options, RenderingContext& context) {
+Result<std::unique_ptr<IRenderer>> IRenderer::create(const RendererOptions& options, RenderingContext& context) {
   switch (options.type) {
     case ERendererType::Metal: {
 #ifdef MOLE_PLATFORM_APPLE

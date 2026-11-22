@@ -104,9 +104,8 @@ There's an abstract `IRenderer` class, which has different implementation, for n
 - stb_image
 - glslang
 - Vulkan Memory Allocator 
-- FlatBuffers (not yet)
+- Dear ImGui
 - AngelScript (not yet)
-- Dear ImGui (not yet)
 
 # About the Repository
 this repository uses the conventional commits format: https://www.conventionalcommits.org/en/v1.0.0/  

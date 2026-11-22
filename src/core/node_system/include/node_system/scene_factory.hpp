@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "node_system/manager_list.hpp"
 #include "node_system/engine_managers.hpp"
 #include "node_system/inode_manager.hpp"
 #include "node_system/manager_reflector_binder.hpp"
@@ -59,7 +60,7 @@ public:
    * @brief Serializes a scene (including its scene_type header) into a writing reflector.
    */
   template <CReflector TReflector>
-    requires(TReflector::is_writing())
+  requires(TReflector::is_writing())
   void save_scene(TReflector& re, const Scene& scene) const {
     auto binder = manager_reflector_binder_factory->create_binder<TReflector>();
 
@@ -121,7 +122,7 @@ public:
    *        the correct scene type and managers.
    */
   template <CReflector TReflector>
-    requires(!TReflector::is_writing())
+  requires(!TReflector::is_writing())
   Result<std::unique_ptr<Scene>> load_scene(TReflector& re) const {
     auto binder = manager_reflector_binder_factory->create_binder<TReflector>();
 
@@ -194,11 +195,38 @@ public:
   }
 
   /**
+   * @brief Registers multiple managers for this SceneFactory instance (calls ::register_manager() for each of them)
+   * @note Asserts that each manager's TYPE_ID must be unique.
+   */
+  template <std::derived_from<INodeManager>... TManagers>
+  void register_managers() {
+    (register_manager<TManagers>(), ...);
+  }
+
+  /**
+   * @brief Registers multiple managers for this SceneFactory instance (calls ::register_manager() for each of them)
+   * @note Asserts that each manager's TYPE_ID must be unique.
+   */
+  template <std::derived_from<INodeManager>... TManagers>
+  void register_managers(ManagerList<TManagers...> manager_list) {
+    (register_manager<TManagers>(), ...);
+  }
+
+  /**
+   * @brief Registers multiple managers for this SceneFactory instance (calls ::register_manager() for each of them)
+   * @note Asserts that each manager's TYPE_ID must be unique.
+   */
+  template <CManagerList TList>
+  void register_managers() {
+    register_managers(TList{});
+  }
+  
+  /**
    * @brief Registers a manager for this SceneFactory instance.
-   * @note Asserts that the manager name must be unique.
+   * @note Asserts that the manager's TYPE_ID must be unique.
    */
   template <typename T>
-    requires std::derived_from<T, INodeManager>
+  requires std::derived_from<T, INodeManager>
   void register_manager() {
     if constexpr (std::constructible_from<T, const NodeSystemContext&>) {
       register_manager_factory(T::TYPE_ID,

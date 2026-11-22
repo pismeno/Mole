@@ -1,3 +1,18 @@
+set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/external/imgui")
+
+add_library(imgui STATIC
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+)
+
+target_include_directories(imgui PUBLIC
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backends
+)
+
 add_executable(MoleEditor)
 
 target_sources(MoleEditor
@@ -11,6 +26,8 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/states/ieditor_state.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/states/workspace_state.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/process_orchestrator.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/project_asset_pipeline.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/iim_gui_bridge.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/editor.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
@@ -20,6 +37,10 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/subprocess.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/states/workspace_state.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/process_orchestrator.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/project_asset_pipeline.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/iim_gui_bridge.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/im_gui_bridge/win32_vulkan_im_gui_bridge.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/im_gui_bridge/win32_vulkan_im_gui_bridge.hpp
 )
 
 target_link_libraries(MoleEditor
@@ -27,6 +48,7 @@ target_link_libraries(MoleEditor
         MoleCore
         glfw
         reproc++
+        imgui
 )
 
 target_include_directories(MoleEditor
@@ -34,7 +56,16 @@ target_include_directories(MoleEditor
         PRIVATE ${CMAKE_SOURCE_DIR}/external/watcher/include
 )
 
+if(WIN32)
+    target_compile_definitions(MoleEditor PRIVATE NOMINMAX MOLE_PLATFORM_WINDOWS)
+    target_sources(MoleEditor PRIVATE
+        ${IMGUI_DIR}/backends/imgui_impl_win32.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+    )
+endif()
+
 if(APPLE)
+    target_compile_definitions(MoleEditor PRIVATE MOLE_PLATFORM_APPLE)
     target_link_libraries(MoleEditor
             PRIVATE
             "-framework Cocoa"

@@ -217,4 +217,8 @@ Result<void> VulkanSwapchain::present(const vk::raii::Queue& present_queue, cons
   return mole::ok();
 }
 
+const vk::raii::SwapchainKHR& VulkanSwapchain::get_swapchain() const {
+  return swap_chain;
+}
+
 } // mole

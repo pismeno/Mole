@@ -1,6 +1,6 @@
 #pragma once
 
-#include "osal/inputs.hpp"
+#include "osal/iinputs.hpp"
 
 struct GLFWwindow;
 

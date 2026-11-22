@@ -38,7 +38,7 @@ target_sources(MoleOSAL
         ${CMAKE_CURRENT_SOURCE_DIR}/osal/file_system/windows_file_system.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/osal/include/osal/iwindow.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/osal/include/osal/inputs.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/osal/include/osal/iinputs.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/osal/include/osal/input_codes.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/osal/include/osal/ifile_system.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/osal/include/osal/os_context.hpp
@@ -160,6 +160,7 @@ target_sources(MoleRendering
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/material_packer.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/material_shader_layout_registry.cpp
 
+        ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/renderer_types.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/irenderer.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/packed_material.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/bindless_texture_registry.hpp

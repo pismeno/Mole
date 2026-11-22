@@ -8,6 +8,8 @@ struct OSContext;
 struct ResourcesContext;
 
 class ProcessOrchestrator;
+class IImGuiBridge;
+
 /**
  * @brief Context for the editor Application layer.
  */
@@ -18,6 +20,7 @@ struct EditorContext {
   ResourcesContext* resources_context;
 
   ProcessOrchestrator* process_orchestrator;
+  IImGuiBridge* im_gui_bridge;
 };
 
 } // mole

@@ -1,50 +1,56 @@
 #pragma once
 
 #include "editor/states/ieditor_state.hpp"
-#include "editor/subprocess.hpp"
 
 #include <memory>
-#include <vector>
+#include <string_view>
 
-#include "resources/material_pool.hpp"
+#include "resources/view_data.hpp"
 #include "utils/result.hpp"
 
 namespace mole {
 
 struct EditorContext;
-class MaterialPool;
-class AssetManager;
-class FileWatcher;
-class IFileSystem;
-class ProcessOrchestrator;
 class Project;
 class ProjectAssets;
-class Subprocess;
+class ProjectAssetPipeline;
+class Scene;
+class AssetManager;
+class SceneFactory;
+class RenderGatherer;
+class IRenderer;
 
 class WorkspaceState : public IEditorState {
 public:
   ~WorkspaceState() override;
 
-  void update() override;
+  static constexpr float PPU = 32.0f; // TODO move into some sort of settings
 
-  [[nodiscard]] const Project& get_project() const;
-  [[nodiscard]] const ProjectAssets& get_project_assets() const;
+  void update() override;
+  void render(IRenderer* renderer) override;
+  void end_frame() override;
+
+  const Project& get_project() const;
+  const ProjectAssets& get_project_assets() const;
 
   static Result<std::unique_ptr<WorkspaceState>> create(std::unique_ptr<Project> project, const EditorContext& context);
 
 private:
   explicit WorkspaceState(const EditorContext& context);
 
-  std::vector<std::unique_ptr<Subprocess>> active_processes;
+  Result<void> load_scene(std::string_view path);
+  ViewData calculate_view_data(IRenderer* renderer);
+  ViewData calculate_view_data(float width, float height);
 
   std::unique_ptr<Project> project;
   std::unique_ptr<ProjectAssets> project_assets;
-  std::unique_ptr<FileWatcher> assets_file_watcher;
+  std::unique_ptr<ProjectAssetPipeline> project_asset_pipeline;
 
-  IFileSystem* file_system;
+  std::unique_ptr<Scene> scene;
+
   AssetManager* asset_manager;
-  MaterialPool* material_pool;
-  ProcessOrchestrator* process_orchestrator;
+  SceneFactory* scene_factory;
+  RenderGatherer* render_gatherer;
 };
 
 } // namespace mole
