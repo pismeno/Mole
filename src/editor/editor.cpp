@@ -168,7 +168,8 @@ Result<void> Editor::init_imgui() {
     .native_window_handle = window->get_native_handle()
   };
 
-  MOLE_TRY_ASSIGN(imgui_bridge, IImGuiBridge::create(bridge_options, context));
+  MOLE_TRY_ASSIGN(im_gui_bridge, IImGuiBridge::create(bridge_options, context));
+  context.im_gui_bridge = im_gui_bridge.get();
 
   return mole::ok();
 }
@@ -220,7 +221,7 @@ Result<void> Editor::run() {
 
     state->update();
 
-    imgui_bridge->begin_frame();
+    im_gui_bridge->begin_frame();
 
     ImGui::Begin("Hello, World!");
     ImGui::Text("Hello, World from Mole Editor!");
@@ -235,7 +236,7 @@ Result<void> Editor::run() {
 
     state->render(renderer.get());
 
-    imgui_bridge->end_frame();
+    im_gui_bridge->end_frame();
 
     renderer->end_frame();
 

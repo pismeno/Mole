@@ -78,7 +78,7 @@ private:
 
   std::unique_ptr<IWindow> window;
   std::unique_ptr<IEditorState> state;
-  std::unique_ptr<IImGuiBridge> imgui_bridge;
+  std::unique_ptr<IImGuiBridge> im_gui_bridge;
 };
 
 } // mole
