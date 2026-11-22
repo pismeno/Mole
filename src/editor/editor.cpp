@@ -6,8 +6,6 @@
 #include <thread>
 #include <utility>
 
-#include <imgui.h>
-
 #include "editor/editor_context.hpp"
 #include "editor/iim_gui_bridge.hpp"
 #include "editor/process_orchestrator.hpp"
@@ -201,12 +199,7 @@ Result<void> Editor::run() {
     }
 
     if (renderer->needs_framebuffer_resize()) {
-      auto r_resize_framebuffer =
-          renderer->resize_framebuffer(window->get_framebuffer_width(), window->get_framebuffer_height());
-
-      if (!r_resize_framebuffer) {
-        return mole::fail(r_resize_framebuffer.error());
-      }
+      MOLE_TRY(renderer->resize_framebuffer(window->get_framebuffer_width(), window->get_framebuffer_height()));
     }
 
     MaterialID test_mat_id2 = MaterialID::from(1, 0);
@@ -221,27 +214,15 @@ Result<void> Editor::run() {
 
     state->update();
 
-    im_gui_bridge->begin_frame();
-
-    ImGui::Begin("Hello, World!");
-    ImGui::Text("Hello, World from Mole Editor!");
-    static int counter = 0;
-    if (ImGui::Button("Click Me!")) {
-      counter++;
-    }
-    ImGui::Text("Button clicked %d times", counter);
-    ImGui::End();
-
     renderer->begin_frame();
+    im_gui_bridge->begin_frame();
 
     state->render(renderer.get());
 
     im_gui_bridge->end_frame();
-
     renderer->end_frame();
 
     state->end_frame();
-
     inputs.end_frame();
 
     if (renderer->needs_framebuffer_resize()) {

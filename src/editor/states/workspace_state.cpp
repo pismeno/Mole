@@ -13,6 +13,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui.h>
 
 #include "editor/editor_context.hpp"
 #include "editor/file_watcher.hpp"
@@ -96,6 +97,15 @@ void WorkspaceState::update() {
 }
 
 void WorkspaceState::render(IRenderer* renderer) {
+  ImGui::Begin("Hello, World!");
+  ImGui::Text("Hello, World from Mole Editor!");
+  static int counter = 0;
+  if (ImGui::Button("Click Me!")) {
+    counter++;
+  }
+  ImGui::Text("Button clicked %d times", counter);
+  ImGui::End();
+  
   renderer->begin_pass(calculate_view_data(renderer));
   if (scene) renderer->submit(render_gatherer->gather_render_commands(*scene));
   renderer->end_pass();
