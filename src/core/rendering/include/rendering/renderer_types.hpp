@@ -2,9 +2,18 @@
 
 #include <cstdint>
 
+#include "utils/id.hpp"
+
 namespace mole {
 
-enum class ERendererType { Metal, Vulkan, DirectX };
+using RenderTargetID = ID<struct RenderTargetIDTag>;
+using PresenterID = ID<struct PresenterIDTag>;
+  
+enum class ERendererType { 
+  Metal, 
+  Vulkan, 
+  DirectX 
+};
 
 enum class ERendererNativeHandle {
   // Core Context / Device
@@ -17,9 +26,7 @@ enum class ERendererNativeHandle {
   GraphicsQueue,          // VkQueue / ID3D12CommandQueue / id<MTLCommandQueue> / WGPUQueue
   ComputeQueue,           // VkQueue / ID3D12CommandQueue
   TransferQueue,          // VkQueue / ID3D12CommandQueue
-  Swapchain,              // VkSwapchainKHR / IDXGISwapChain / WGPUSwapChain
   ActiveCommandBuffer,    // VkCommandBuffer / ID3D12GraphicsCommandList / id<MTLCommandBuffer>
-  ActiveRenderTargetView, // VkImageView / ID3D12Resource / id<MTLTexture>
 };
 
 struct RendererBackendInfo {

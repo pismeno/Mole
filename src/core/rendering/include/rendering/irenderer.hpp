@@ -12,12 +12,7 @@
 namespace mole {
 
 struct RenderingContext;
-
-struct RendererOptions {
-  ERendererType type;
-  void* native_window_handle;
-  uint32_t window_width, window_height;
-};
+class IWindow;
 
 class IRenderer {
 public:
@@ -31,23 +26,33 @@ public:
   virtual void end_pass() = 0;
   virtual void end_frame() = 0;
 
-  virtual Result<void> resize_framebuffer(uint32_t width, uint32_t height) = 0;
-  virtual bool needs_framebuffer_resize() const noexcept = 0;
+  virtual Result<RenderTargetID> create_render_target(const uint32_t width, uint32_t height);
+  virtual Result<PresenterID> create_presenter(const IWindow& window);
+
+  virtual Result<void> destroy(RenderTargetID render_target_id);
+  virtual Result<void> destroy(PresenterID presenter_id);
+
+  virtual Result<void> resize_framebuffer(PresenterID presenter_id, uint32_t width, uint32_t height) = 0;
+  virtual bool needs_framebuffer_resize(PresenterID presenter_id) const noexcept = 0;
+  [[nodiscard]] virtual uint32_t get_framebuffer_width(RenderTargetID render_target_id) const noexcept = 0;
+  [[nodiscard]] virtual uint32_t get_framebuffer_height(RenderTargetID render_target_id) const noexcept = 0;
+  [[nodiscard]] virtual uint32_t get_framebuffer_width(PresenterID presenter_id) const noexcept = 0;
+  [[nodiscard]] virtual uint32_t get_framebuffer_height(PresenterID presenter_id) const noexcept = 0;
+  
   virtual bool is_context_lost() const noexcept = 0;
 
-  [[nodiscard]] virtual uint32_t get_framebuffer_width() const noexcept = 0;
-  [[nodiscard]] virtual uint32_t get_framebuffer_height() const noexcept = 0;
-
   virtual void* get_native_handle(ERendererNativeHandle handle_type) const = 0;
+  virtual void* get_native_handle(RenderTargetID render_target_id) const = 0;
+  virtual void* get_native_handle(PresenterID presenter_id) const = 0;
   virtual RendererBackendInfo get_backend_info() const = 0;
 
-  template <typename T>
-  T get_native_handle(ERendererNativeHandle handle_type) const { return reinterpret_cast<T>(get_native_handle(handle_type)); }
+  template <typename TCast, typename TArg>
+  TCast get_native_handle(TArg arg) const { return reinterpret_cast<TCast>(get_native_handle(arg)); }
 
   /**
    * @brief Factory method to create the specific implementation
    */
-  static Result<std::unique_ptr<IRenderer>> create(const RendererOptions& options, RenderingContext& context);
+  static Result<std::unique_ptr<IRenderer>> create(ERendererType type, RenderingContext& context);
 };
 
 } // mole
