@@ -26,6 +26,22 @@ struct CombinedShaderKeyHash {
   }
 };
 
+/** @brief Identifies a pipeline: the shader pair plus the color attachment format it renders into. */
+struct PipelineKey {
+  CombinedShaderKey shader_key;
+  uint32_t color_format; // vk::Format
+
+  bool operator==(const PipelineKey& other) const {
+    return shader_key == other.shader_key && color_format == other.color_format;
+  }
+};
+
+struct PipelineKeyHash {
+  std::size_t operator()(const PipelineKey& k) const {
+    return CombinedShaderKeyHash()(k.shader_key) ^ (std::hash<uint32_t>()(k.color_format) << 2);
+  }
+};
+
 struct PipelineShadersVersion {
   uint32_t vert_version;
   uint32_t frag_version;

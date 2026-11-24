@@ -10,6 +10,7 @@ add_executable(MoleTests
         file_system_test.cpp
         asset_manager_test.cpp
         scene_material_asset_test.cpp
+        slot_map_test.cpp
 )
 
 target_link_libraries(MoleTests

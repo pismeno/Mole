@@ -12,10 +12,9 @@ namespace mole {
 
 class VulkanContext;
 class VulkanMaterialHandler;
-class VulkanSwapchain;
 
 struct VulkanPipelineOptions {
-  VulkanSwapchain& swapchain;
+  vk::Format color_format;
   VulkanContext& vk_context;
   VulkanMaterialHandler& material_handler;
   vk::raii::DescriptorSetLayout& descriptor_set_layout;

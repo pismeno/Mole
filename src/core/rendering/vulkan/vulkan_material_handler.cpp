@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
@@ -320,8 +321,12 @@ Result<void> VulkanMaterialHandler::upload_textures_to_gpu(const std::vector<Tex
   if (cmd_buffer.end() != vk::Result::eSuccess) return mole::fail("Failed to end upload command buffer");
 
   vk::SubmitInfo submit_info{.commandBufferCount = 1, .pCommandBuffers = &*cmd_buffer};
-  vk_context.get_graphics_queue().submit(submit_info, nullptr);
-  vk_context.get_graphics_queue().waitIdle();
+  if (vk_context.get_graphics_queue().submit(submit_info, nullptr) != vk::Result::eSuccess) {
+    return mole::fail("Failed to submit texture upload command buffer");
+  }
+  if (vk_context.get_graphics_queue().waitIdle() != vk::Result::eSuccess) {
+    return mole::fail("Failed to wait for texture upload to finish");
+  }
 
   // 7. Write descriptors
   vk_context.get_logical_device().updateDescriptorSets(descriptor_writes, nullptr);
@@ -362,7 +367,11 @@ Result<void> VulkanMaterialHandler::make_texture_versions_current() {
 
     if (gpu_texture.version != current_asset_version) {
       auto r_asset = asset_manager->acquire<ImageAsset>(gpu_texture.asset_uuid);
-      if (!r_asset) return mole::fail(r_asset.error());
+      if (!r_asset) {
+        // Per-asset problem: keep the old texture on the GPU and retry next time.
+        std::cerr << "VulkanMaterialHandler: failed to reload texture: " << r_asset.error() << std::endl;
+        continue;
+      }
 
       AssetHandle<ImageAsset> asset = std::move(r_asset).value();
 
@@ -446,18 +455,24 @@ Result<void> VulkanMaterialHandler::prepare_materials(std::vector<MaterialID> ma
     }
   }
 
+  // Per-material problems (missing asset, packed data too large, ...) are logged and only affect that material.
   for (MaterialID mat_id : to_upload) {
     auto r_upload = upload_material(mat_id);
-    if (!r_upload) return r_upload;
+    if (!r_upload) {
+      std::cerr << "VulkanMaterialHandler: skipping material " << mat_id.id << ": " << r_upload.error() << std::endl;
+    }
   }
 
   for (MaterialID mat_id : to_update) {
     auto r_update = update_material(mat_id);
-    if (!r_update) return r_update;
+    if (!r_update) {
+      std::cerr << "VulkanMaterialHandler: failed to update material " << mat_id.id << ": " << r_update.error()
+                << std::endl;
+    }
   }
 
-  auto r_update_texture_buffer = update_texture_buffer();
-  if (!r_update_texture_buffer) return r_update_texture_buffer;
+  // Vulkan failures during texture uploads are fatal and returned.
+  MOLE_TRY(update_texture_buffer());
 
   return mole::ok();
 }

@@ -35,6 +35,10 @@ public:
   ~VulkanMaterialHandler() = default;
 
   Result<void> update_texture_buffer();
+  /**
+   * @brief Uploads/updates the given materials and pending textures. Per-material problems are logged and skipped;
+   * only Vulkan failures are returned.
+   */
   Result<void> prepare_materials(std::vector<MaterialID> material_ids);
   void free_unused_materials();
 

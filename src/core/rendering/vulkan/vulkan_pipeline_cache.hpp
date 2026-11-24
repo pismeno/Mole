@@ -16,22 +16,20 @@ namespace mole {
 class VulkanContext;
 class VulkanMaterialHandler;
 class VulkanPipeline;
-class VulkanSwapchain;
 
 class VulkanPipelineCache {
  public:
   explicit VulkanPipelineCache(
-      VulkanSwapchain& swapchain,
       VulkanContext& vk_context,
       VulkanMaterialHandler& material_handler,
       vk::raii::DescriptorSetLayout& descriptor_set_layout);
   ~VulkanPipelineCache();
 
-  Result<VulkanPipeline*> get(const AssetHandle<VertexShaderAsset>& vert, const AssetHandle<FragmentShaderAsset>& frag);
+  Result<VulkanPipeline*> get(const AssetHandle<VertexShaderAsset>& vert, const AssetHandle<FragmentShaderAsset>& frag,
+                              vk::Format color_format);
  private:
-  std::unordered_map<CombinedShaderKey, std::unique_ptr<VulkanPipeline>, CombinedShaderKeyHash> pipelines;
-  std::unordered_map<CombinedShaderKey, PipelineShadersVersion, CombinedShaderKeyHash> pipeline_shaders_versions;
-  VulkanSwapchain& swapchain;
+  std::unordered_map<PipelineKey, std::unique_ptr<VulkanPipeline>, PipelineKeyHash> pipelines;
+  std::unordered_map<PipelineKey, PipelineShadersVersion, PipelineKeyHash> pipeline_shaders_versions;
   VulkanContext& vk_context;
   VulkanMaterialHandler& material_handler;
   vk::raii::DescriptorSetLayout& descriptor_set_layout;

@@ -13,6 +13,23 @@ namespace mole {
 
 class VulkanContext;
 
+enum class ESwapchainStatus {
+  Ok,
+  Suboptimal,
+  OutOfDate,
+  SurfaceLost,
+  DeviceLost,
+  Error
+};
+
+struct SwapchainAcquireResult {
+  ESwapchainStatus status;
+  uint32_t image_index;
+};
+
+/** @brief Maps a present/acquire vk::Result to a swapchain status. */
+[[nodiscard]] ESwapchainStatus to_swapchain_status(vk::Result result);
+
 class VulkanSwapchain {
 public:
   ~VulkanSwapchain() = default;
@@ -24,17 +41,18 @@ public:
   inline size_t get_image_count() const { return swap_chain_images.size(); }
   [[nodiscard]] const vk::raii::SwapchainKHR& get_swapchain() const;
 
-  Result<uint32_t> acquire_next_image(const vk::raii::Semaphore& present_complete_semaphore);
-  Result<void> present(const vk::raii::Queue& present_queue, const vk::raii::Semaphore& render_finished_semaphore, uint32_t image_index);
+  [[nodiscard]] SwapchainAcquireResult acquire_next_image(const vk::raii::Semaphore& image_available_semaphore);
 
-  Result<void> recreate(VulkanContext& vk_context, uint32_t window_width, uint32_t window_height);
+  Result<void> recreate(const VulkanContext& vk_context, const vk::raii::SurfaceKHR& surface, vk::Extent2D extent);
 
-  static Result<std::unique_ptr<VulkanSwapchain>> create(VulkanContext& vk_context, uint32_t window_width, uint32_t window_height);
+  static Result<std::unique_ptr<VulkanSwapchain>> create(const VulkanContext& vk_context,
+                                                         const vk::raii::SurfaceKHR& surface, vk::Extent2D extent);
 private:
   explicit VulkanSwapchain() = default;
 
-  Result<void> create_swap_chain(VulkanContext& vk_context, uint32_t window_width, uint32_t window_height);
-  Result<void> create_image_views(VulkanContext& vk_context);
+  Result<void> create_swap_chain(const VulkanContext& vk_context, const vk::raii::SurfaceKHR& surface,
+                                 vk::Extent2D extent);
+  Result<void> create_image_views(const VulkanContext& vk_context);
 
   vk::raii::SwapchainKHR swap_chain = nullptr;
 
