@@ -20,6 +20,7 @@ target_sources(MoleUtils INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/uuid.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/creflector.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/json_reflector.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils/include/utils/slot_map.hpp
 )
 
 target_include_directories(MoleUtils INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/utils/include)
@@ -145,6 +146,10 @@ target_sources(MoleRendering
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/vulkan/vulkan_memory_allocator.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/vulkan/vulkan_swapchain.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/vulkan/vulkan_swapchain.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rendering/vulkan/vulkan_presenter.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rendering/vulkan/vulkan_presenter.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rendering/vulkan/vulkan_render_target.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rendering/vulkan/vulkan_render_target.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/vulkan/vulkan_pipeline.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/vulkan/vulkan_pipeline.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/vulkan/vulkan_pipeline_cache.hpp

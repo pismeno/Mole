@@ -16,16 +16,32 @@
 
 namespace mole {
 
-Result<std::unique_ptr<VulkanSwapchain>> VulkanSwapchain::create(VulkanContext& vk_context, uint32_t window_width, uint32_t window_height) {
-    std::unique_ptr<VulkanSwapchain> swapchain(new VulkanSwapchain());
+Result<std::unique_ptr<VulkanSwapchain>> VulkanSwapchain::create(const VulkanContext& vk_context,
+                                                                 const vk::raii::SurfaceKHR& surface,
+                                                                 vk::Extent2D extent) {
+  std::unique_ptr<VulkanSwapchain> swapchain(new VulkanSwapchain());
 
-    auto r_create_swap_chain = swapchain->create_swap_chain(vk_context, window_width, window_height);
-    if (!r_create_swap_chain) return mole::fail(r_create_swap_chain.error());
+  MOLE_TRY(swapchain->create_swap_chain(vk_context, surface, extent));
+  MOLE_TRY(swapchain->create_image_views(vk_context));
 
-    auto r_create_image_views = swapchain->create_image_views(vk_context);
-    if (!r_create_image_views) return mole::fail(r_create_image_views.error());
+  return std::move(swapchain);
+}
 
-    return std::move(swapchain);
+ESwapchainStatus to_swapchain_status(vk::Result result) {
+  switch (result) {
+    case vk::Result::eSuccess:
+      return ESwapchainStatus::Ok;
+    case vk::Result::eSuboptimalKHR:
+      return ESwapchainStatus::Suboptimal;
+    case vk::Result::eErrorOutOfDateKHR:
+      return ESwapchainStatus::OutOfDate;
+    case vk::Result::eErrorSurfaceLostKHR:
+      return ESwapchainStatus::SurfaceLost;
+    case vk::Result::eErrorDeviceLost:
+      return ESwapchainStatus::DeviceLost;
+    default:
+      return ESwapchainStatus::Error;
+  }
 }
 
 vk::SurfaceFormatKHR choose_swap_surface_format(std::vector<vk::SurfaceFormatKHR> const &availableFormats) {
@@ -44,19 +60,6 @@ vk::PresentModeKHR choose_swap_present_mode(std::vector<vk::PresentModeKHR> cons
          vk::PresentModeKHR::eFifo;
 }
 
-vk::Extent2D choose_swap_extent(vk::SurfaceCapabilitiesKHR const &capabilities, uint32_t window_width, uint32_t window_height)
-{
-  if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
-  {
-    return capabilities.currentExtent;
-  }
-
-  return {
-      std::clamp<uint32_t>(window_width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
-      std::clamp<uint32_t>(window_height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
-  };
-}
-
 uint32_t choose_swap_min_image_count(vk::SurfaceCapabilitiesKHR const &surfaceCapabilities)
 {
   auto minImageCount = std::max(3u, surfaceCapabilities.minImageCount);
@@ -67,9 +70,9 @@ uint32_t choose_swap_min_image_count(vk::SurfaceCapabilitiesKHR const &surfaceCa
   return minImageCount;
 }
 
-Result<void> VulkanSwapchain::create_swap_chain(VulkanContext& vk_context, uint32_t window_width, uint32_t window_height) {
+Result<void> VulkanSwapchain::create_swap_chain(const VulkanContext& vk_context, const vk::raii::SurfaceKHR& surface,
+                                               vk::Extent2D extent) {
   const vk::raii::PhysicalDevice& physical_device = vk_context.get_physical_device();
-  const vk::raii::SurfaceKHR& surface = vk_context.get_surface();
 
   auto caps_res = physical_device.getSurfaceCapabilitiesKHR(*surface);
   if (caps_res.result != vk::Result::eSuccess) return mole::fail("Failed to get surface capabilities");
@@ -83,7 +86,7 @@ Result<void> VulkanSwapchain::create_swap_chain(VulkanContext& vk_context, uint3
   if (modes_res.result != vk::Result::eSuccess) return mole::fail("Failed to get present modes");
   std::vector<vk::PresentModeKHR> availablePresentModes = modes_res.value;
 
-  swap_chain_extent = choose_swap_extent(surface_capabilities, window_width, window_height);
+  swap_chain_extent = extent;
   if (swap_chain_extent.width == 0 || swap_chain_extent.height == 0) {
     return mole::fail("Cannot create swapchain with zero extent");
   }
@@ -122,7 +125,7 @@ Result<void> VulkanSwapchain::create_swap_chain(VulkanContext& vk_context, uint3
   return mole::ok();
 }
 
-Result<void> VulkanSwapchain::create_image_views(VulkanContext& vk_context) {
+Result<void> VulkanSwapchain::create_image_views(const VulkanContext& vk_context) {
   assert(swap_chain_image_views.empty());
 
   vk::ImageViewCreateInfo image_view_create_info{
@@ -149,72 +152,30 @@ Result<void> VulkanSwapchain::create_image_views(VulkanContext& vk_context) {
   return mole::ok();
 }
 
-Result<void> VulkanSwapchain::recreate(VulkanContext& vk_context, uint32_t window_width, uint32_t window_height) {
-  if (window_width == 0 || window_height == 0) {
-    return mole::fail("Cannot recreate swapchain with zero dimensions");
+Result<void> VulkanSwapchain::recreate(const VulkanContext& vk_context, const vk::raii::SurfaceKHR& surface,
+                                      vk::Extent2D extent) {
+  if (vk_context.get_logical_device().waitIdle() != vk::Result::eSuccess) {
+    return mole::fail("Failed to wait for device idle before swapchain recreation");
   }
-
-  const vk::raii::PhysicalDevice& physical_device = vk_context.get_physical_device();
-  const vk::raii::SurfaceKHR& surface = vk_context.get_surface();
-
-  auto caps_res = physical_device.getSurfaceCapabilitiesKHR(*surface);
-  if (caps_res.result != vk::Result::eSuccess) return mole::fail("Failed to get surface capabilities");
-  if (caps_res.value.currentExtent.width == 0 && caps_res.value.currentExtent.height == 0) {
-    return mole::fail("Cannot recreate swapchain while window is minimized");
-  }
-
-  vk_context.get_logical_device().waitIdle();
 
   swap_chain_image_views.clear();
+  swap_chain_images.clear();
   swap_chain = nullptr;
 
-  auto r_create_swap_chain = create_swap_chain(vk_context, window_width, window_height); // TODO later it should be done directly here to pass current swap chain into create swap chain struct as an old to not lose render commands
-  if (!r_create_swap_chain) return r_create_swap_chain;
-
-  auto r_create_image_views = create_image_views(vk_context);
-  if (!r_create_image_views) return r_create_image_views;
+  // TODO later it should be done directly here to pass current swap chain into create swap chain struct as an old to not lose render commands
+  MOLE_TRY(create_swap_chain(vk_context, surface, extent));
+  MOLE_TRY(create_image_views(vk_context));
 
   return mole::ok();
 }
 
-Result<uint32_t> VulkanSwapchain::acquire_next_image(const vk::raii::Semaphore& present_complete_semaphore) {
-  // Use UINT64_MAX to disable the timeout
-  auto acquire_res = swap_chain.acquireNextImage(UINT64_MAX, *present_complete_semaphore, nullptr);
-
-  // Check for window resize conditions
-  if (acquire_res.result == vk::Result::eErrorOutOfDateKHR || acquire_res.result == vk::Result::eSuboptimalKHR) {
-    return mole::fail("Swapchain out of date or suboptimal");
-  } else if (acquire_res.result == vk::Result::eErrorDeviceLost) {
-    return mole::fail("Device lost");
-  } else if (acquire_res.result != vk::Result::eSuccess) {
-    return mole::fail("Failed to acquire next swapchain image");
-  }
-
-  return acquire_res.value;
-}
-
-Result<void> VulkanSwapchain::present(const vk::raii::Queue& present_queue, const vk::raii::Semaphore& render_finished_semaphore, uint32_t image_index) {
-  vk::PresentInfoKHR present_info{
-      .waitSemaphoreCount = 1,
-      .pWaitSemaphores    = &*render_finished_semaphore,
-      .swapchainCount     = 1,
-      .pSwapchains        = &*swap_chain,
-      .pImageIndices      = &image_index
+SwapchainAcquireResult VulkanSwapchain::acquire_next_image(const vk::raii::Semaphore& image_available_semaphore) {
+  auto acquire_res = swap_chain.acquireNextImage(UINT64_MAX, *image_available_semaphore, nullptr);
+  SwapchainAcquireResult result{
+    .status = to_swapchain_status(acquire_res.result),
+    .image_index = acquire_res.value
   };
-
-  // presentKHR returns a vk::Result directly, not a ResultValue
-  vk::Result present_res = present_queue.presentKHR(present_info);
-
-  // Check for window resize conditions
-  if (present_res == vk::Result::eErrorOutOfDateKHR || present_res == vk::Result::eSuboptimalKHR) {
-    return mole::fail("Swapchain out of date or suboptimal");
-  } else if (present_res == vk::Result::eErrorDeviceLost) {
-    return mole::fail("Device lost");
-  } else if (present_res != vk::Result::eSuccess) {
-    return mole::fail("Failed to present swapchain image");
-  }
-
-  return mole::ok();
+  return result;
 }
 
 const vk::raii::SwapchainKHR& VulkanSwapchain::get_swapchain() const {

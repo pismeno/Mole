@@ -19,14 +19,11 @@
 
 namespace mole {
 
-Result<std::unique_ptr<VulkanContext>> VulkanContext::create(void* native_window_handle) {
+Result<std::unique_ptr<VulkanContext>> VulkanContext::create() {
   auto context = std::unique_ptr<VulkanContext>(new VulkanContext());
 
   auto r_create_instance = context->create_instance();
   if (!r_create_instance) return mole::fail(r_create_instance.error());
-
-  auto r_create_surface = context->create_surface(native_window_handle);
-  if (!r_create_surface) return mole::fail(r_create_surface.error());
 
   auto r_pick_physical_device = context->pick_physical_device();
   if (!r_pick_physical_device) return mole::fail(r_pick_physical_device.error());
@@ -77,21 +74,12 @@ Result<void> VulkanContext::create_instance() {
   return mole::ok();
 }
 
-Result<void> VulkanContext::create_surface(void* native_window_handle) {
-  vk::Win32SurfaceCreateInfoKHR createInfo{
-      .hinstance = GetModuleHandle(nullptr),
-      .hwnd      = static_cast<HWND>(native_window_handle)
-  };
-
-  // Dereference RAII object to get the raw vk::Instance wrapper to call creation
-  vk::Instance raw_instance = *vk_instance;
-  auto surf_res = raw_instance.createWin32SurfaceKHR(createInfo);
-  if (surf_res.result != vk::Result::eSuccess) {
-    return mole::fail("Failed to create Win32 Surface");
-  }
-
-  surface = vk::raii::SurfaceKHR(vk_instance, surf_res.value);
-  return mole::ok();
+bool VulkanContext::supports_presentation(const vk::PhysicalDevice& physical_device, uint32_t queue_family) {
+#ifdef MOLE_PLATFORM_WINDOWS
+  return physical_device.getWin32PresentationSupportKHR(queue_family) == vk::True;
+#else
+  return true;
+#endif
 }
 
 inline uint32_t calculate_texture_capacity(const vk::PhysicalDeviceLimits& limits) {
@@ -136,8 +124,7 @@ bool VulkanContext::is_physical_device_suitable(const vk::PhysicalDevice &physic
 
   for (uint32_t i = 0; i < queue_families.size(); ++i) {
     const bool supports_graphics = bool(queue_families[i].queueFlags & vk::QueueFlagBits::eGraphics);
-    const auto present_res = physical_device.getSurfaceSupportKHR(i, *surface);
-    const bool supports_present = (present_res.result == vk::Result::eSuccess && present_res.value);
+    const bool supports_present = supports_presentation(physical_device, i);
 
     if (supports_graphics && supports_present) {
       has_suitable_queue = true;
@@ -207,10 +194,7 @@ Result<void> VulkanContext::create_logical_device() {
 
   // get the first index into queue_family_properties which supports both graphics and present
   for (uint32_t qfp_index = 0; qfp_index < queue_family_properties.size(); qfp_index++) {
-
-    // FIX 1: Extract the ResultValue properly instead of treating it as a raw bool
-    auto support_res = physical_device.getSurfaceSupportKHR(qfp_index, *surface);
-    bool supports_present = (support_res.result == vk::Result::eSuccess) && support_res.value;
+    const bool supports_present = supports_presentation(*physical_device, qfp_index);
 
     if ((queue_family_properties[qfp_index].queueFlags & vk::QueueFlagBits::eGraphics) && supports_present) {
       // found a queue family that supports both graphics and present

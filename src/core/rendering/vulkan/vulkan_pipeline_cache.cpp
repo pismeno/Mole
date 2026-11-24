@@ -10,7 +10,6 @@
 #include "rendering/vulkan/vulkan_context.hpp"
 #include "rendering/vulkan/vulkan_material_handler.hpp"
 #include "rendering/vulkan/vulkan_pipeline.hpp"
-#include "rendering/vulkan/vulkan_swapchain.hpp"
 #include "resources/asset_handle.hpp"
 #include "resources/asset_types.hpp"
 #include "utils/result.hpp"
@@ -18,19 +17,25 @@
 namespace mole {
 
 VulkanPipelineCache::VulkanPipelineCache(
-    VulkanSwapchain& swapchain,
     VulkanContext& vk_context,
     VulkanMaterialHandler& material_handler,
     vk::raii::DescriptorSetLayout& descriptor_set_layout)
-    : swapchain(swapchain),
-      vk_context(vk_context),
+    : vk_context(vk_context),
       material_handler(material_handler),
       descriptor_set_layout(descriptor_set_layout) {}
 
 VulkanPipelineCache::~VulkanPipelineCache() = default;
 
-Result<VulkanPipeline*> VulkanPipelineCache::get(const AssetHandle<VertexShaderAsset>& vert, const AssetHandle<FragmentShaderAsset>& frag) {
-  CombinedShaderKey key{vert.get_packed_id(), frag.get_packed_id()};
+Result<VulkanPipeline*> VulkanPipelineCache::get(const AssetHandle<VertexShaderAsset>& vert,
+                                                 const AssetHandle<FragmentShaderAsset>& frag,
+                                                 vk::Format color_format) {
+  PipelineKey key{
+    .shader_key = CombinedShaderKey{
+      vert.get_packed_id(),
+      frag.get_packed_id()
+    },
+    .color_format = static_cast<uint32_t>(color_format)
+  };
   PipelineShadersVersion current_version{vert.get_version(), frag.get_version()};
   auto it_pipelines = pipelines.find(key);
   if (it_pipelines != pipelines.end()) {
@@ -44,7 +49,7 @@ Result<VulkanPipeline*> VulkanPipelineCache::get(const AssetHandle<VertexShaderA
   }
 
   VulkanPipelineOptions create_options{
-    .swapchain = swapchain,
+    .color_format = color_format,
     .vk_context = vk_context,
     .material_handler = material_handler,
     .descriptor_set_layout = descriptor_set_layout,

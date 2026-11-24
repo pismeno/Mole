@@ -11,7 +11,6 @@
 
 #include "rendering/vulkan/vulkan_context.hpp"
 #include "rendering/vulkan/vulkan_material_handler.hpp"
-#include "rendering/vulkan/vulkan_swapchain.hpp"
 #include "resources/asset_handle.hpp"
 #include "resources/asset_types.hpp"
 #include "utils/result.hpp"
@@ -88,17 +87,12 @@ Result<void> VulkanPipeline::create_graphics_pipeline(const VulkanPipelineOption
   // input assembly create info
   vk::PipelineInputAssemblyStateCreateInfo input_assembly{.topology = vk::PrimitiveTopology::eTriangleList};
 
-  const vk::Extent2D& swap_chain_extent = options.swapchain.get_extent();
-  // viewport and scissor
-  vk::Viewport viewport{0.0f, static_cast<float>(swap_chain_extent.height), static_cast<float>(swap_chain_extent.width), -static_cast<float>(swap_chain_extent.height), 0.0f, 1.0f};
-  vk::Rect2D scissor{vk::Offset2D{ 0, 0 }, swap_chain_extent};
-
-  // viewport create info
+  // viewport and scissor are dynamic state, set per pass from the target extent
   vk::PipelineViewportStateCreateInfo viewport_state{
       .viewportCount = 1,
-      .pViewports = &viewport,
+      .pViewports = nullptr,
       .scissorCount = 1,
-      .pScissors = &scissor
+      .pScissors = nullptr
   };
 
   // rasterizer create info
@@ -174,7 +168,7 @@ Result<void> VulkanPipeline::create_graphics_pipeline(const VulkanPipelineOption
       },
       {
           .colorAttachmentCount    = 1,
-          .pColorAttachmentFormats = &options.swapchain.get_surface_format().format
+          .pColorAttachmentFormats = &options.color_format
       }
   };
 

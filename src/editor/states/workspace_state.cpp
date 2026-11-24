@@ -17,6 +17,7 @@
 
 #include "editor/editor_context.hpp"
 #include "editor/file_watcher.hpp"
+#include "editor/iim_gui_bridge.hpp"
 #include "editor/process_orchestrator.hpp"
 #include "editor/project.hpp"
 #include "editor/project_asset_pipeline.hpp"
@@ -30,6 +31,7 @@
 #include "osal/ifile_system.hpp"
 #include "osal/os_context.hpp"
 #include "rendering/irenderer.hpp"
+#include "rendering/rendering_context.hpp"
 #include "resources/asset_handle.hpp"
 #include "resources/asset_manager.hpp"
 #include "resources/asset_types.hpp"
@@ -43,8 +45,16 @@ namespace mole {
 WorkspaceState::WorkspaceState(const EditorContext& context) : 
   asset_manager(context.resources_context->asset_manager),
   scene_factory(context.node_system_context->scene_factory),
-  render_gatherer(context.node_system_context->render_gatherer) {}
-WorkspaceState::~WorkspaceState() = default;
+  render_gatherer(context.node_system_context->render_gatherer),
+  renderer(context.rendering_context->renderer),
+  im_gui_bridge(context.im_gui_bridge) {}
+
+WorkspaceState::~WorkspaceState() {
+  if (viewport_target.is_valid()) {
+    im_gui_bridge->release_texture(viewport_target);
+    (void)renderer->destroy(viewport_target);
+  }
+}
 
 const Project& WorkspaceState::get_project() const { return *project; }
 
@@ -96,7 +106,9 @@ void WorkspaceState::update() {
   if (scene) scene->update();
 }
 
-void WorkspaceState::render(IRenderer* renderer) {
+Result<void> WorkspaceState::render() {
+  auto dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+  
   ImGui::Begin("Hello, World!");
   ImGui::Text("Hello, World from Mole Editor!");
   static int counter = 0;
@@ -105,10 +117,52 @@ void WorkspaceState::render(IRenderer* renderer) {
   }
   ImGui::Text("Button clicked %d times", counter);
   ImGui::End();
-  
-  renderer->begin_pass(calculate_view_data(renderer));
-  if (scene) renderer->submit(render_gatherer->gather_render_commands(*scene));
-  renderer->end_pass();
+
+  ImGui::SetNextWindowDockID(dockspace_id, ImGuiCond_FirstUseEver);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+  const bool visible = ImGui::Begin("Game Viewport");
+  ImGui::PopStyleVar();
+  Result<void> r_viewport = visible ? render_game_viewport() : mole::ok();
+  ImGui::End(); // always matched, even on failure
+  return r_viewport;
+}
+
+Result<void> WorkspaceState::render_game_viewport() {
+  const ImVec2 available = ImGui::GetContentRegionAvail();
+  const uint32_t width = static_cast<uint32_t>((std::max)(1.0f, available.x));
+  const uint32_t height = static_cast<uint32_t>((std::max)(1.0f, available.y));
+
+  if (!viewport_target.is_valid()) {
+    MOLE_TRY_ASSIGN(viewport_target, renderer->create_render_target(RenderTargetOptions{
+      .width = width,
+      .height = height
+    }));
+  } else {
+    MOLE_TRY_ASSIGN(const RenderTargetInfo info, renderer->get_info(viewport_target));
+    if (info.width != width || info.height != height) {
+      MOLE_TRY(renderer->resize(viewport_target, width, height));
+      viewport_rendered = false;
+    }
+  }
+
+  PassOptions pass_options{
+    .view_data = calculate_view_data(static_cast<float>(width), static_cast<float>(height)),
+    .clear_color = glm::vec4(0.0f, 1.0f, 0.5f, 1.0f)
+  };
+
+  MOLE_TRY_ASSIGN(bool pass_open, renderer->begin_pass(viewport_target, pass_options));
+  if (pass_open) {
+    if (scene) renderer->submit(render_gatherer->gather_render_commands(*scene));
+    MOLE_TRY(renderer->end_pass());
+    viewport_rendered = true;
+  }
+
+  if (!viewport_rendered) return mole::ok(); // never sample an RT whose layout is still undefined
+
+  MOLE_TRY_ASSIGN(const uint64_t texture_id, im_gui_bridge->get_texture_id(viewport_target));
+  ImGui::Image(ImTextureRef(static_cast<ImTextureID>(texture_id)), ImVec2(static_cast<float>(width), static_cast<float>(height)));
+
+  return mole::ok();
 }
 
 void WorkspaceState::end_frame() {
@@ -121,13 +175,6 @@ Result<void> WorkspaceState::load_scene(std::string_view path) {
   MOLE_TRY_ASSIGN(scene, scene_factory->instantiate_scene(scene_asset));
 
   return mole::ok();
-}
-
-ViewData WorkspaceState::calculate_view_data(IRenderer* renderer) {
-  float width = static_cast<float>(renderer->get_framebuffer_width());
-  float height = static_cast<float>((std::max)(1u, renderer->get_framebuffer_height()));
-  
-  return calculate_view_data(width, height);
 }
 
 ViewData WorkspaceState::calculate_view_data(float width, float height) {

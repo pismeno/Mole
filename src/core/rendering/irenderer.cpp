@@ -14,8 +14,8 @@
 
 namespace mole {
 
-Result<std::unique_ptr<IRenderer>> IRenderer::create(const RendererOptions& options, RenderingContext& context) {
-  switch (options.type) {
+Result<std::unique_ptr<IRenderer>> IRenderer::create(ERendererType type, RenderingContext& context) {
+  switch (type) {
     case ERendererType::Metal: {
 #ifdef MOLE_PLATFORM_APPLE
       return std::make_unique<MetalRenderer>();
@@ -25,8 +25,7 @@ Result<std::unique_ptr<IRenderer>> IRenderer::create(const RendererOptions& opti
     }
     case ERendererType::Vulkan: {
 #ifdef MOLE_PLATFORM_WINDOWS
-      auto r_vulkan =
-          VulkanRenderer::create(context, options.native_window_handle, options.window_width, options.window_height);
+      auto r_vulkan = VulkanRenderer::create(context);
       if (!r_vulkan) return mole::fail(r_vulkan.error());
 
       return std::unique_ptr<IRenderer>(std::move(r_vulkan).value());

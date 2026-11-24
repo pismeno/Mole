@@ -2,14 +2,16 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <memory>
 #include <optional>
-#include <ranges>
+#include <string>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <vk_mem_alloc_raii.hpp>
@@ -25,6 +27,8 @@
 #include "rendering/vulkan/vulkan_memory_allocator.hpp"
 #include "rendering/vulkan/vulkan_pipeline.hpp"
 #include "rendering/vulkan/vulkan_pipeline_cache.hpp"
+#include "rendering/vulkan/vulkan_presenter.hpp"
+#include "rendering/vulkan/vulkan_render_target.hpp"
 #include "rendering/vulkan/vulkan_swapchain.hpp"
 #include "resources/asset_handle.hpp"
 #include "resources/asset_manager.hpp"
@@ -38,6 +42,8 @@ namespace mole {
 
 namespace {
 
+static_assert(sizeof(void*) == 8, "Native handles are passed as void*, which requires 64-bit pointers");
+
 template <typename T>
 void* to_native_handle_ptr(T handle) {
   if constexpr (std::is_pointer_v<T>) {
@@ -47,67 +53,81 @@ void* to_native_handle_ptr(T handle) {
   }
 }
 
-} // namespace
+struct LayoutAccess {
+  vk::PipelineStageFlags2 stage;
+  vk::AccessFlags2 access;
+};
 
-VulkanRenderer::~VulkanRenderer() {
-  if (!is_context_lost_ && vk_context) {
-    vk_context->get_logical_device().waitIdle();
+/// Source stage/access for a barrier out of `layout`, as left by this renderer.
+LayoutAccess get_src_access(vk::ImageLayout layout) {
+  switch (layout) {
+    case vk::ImageLayout::eShaderReadOnlyOptimal:
+      return LayoutAccess{
+        .stage = vk::PipelineStageFlagBits2::eFragmentShader,
+        .access = vk::AccessFlagBits2::eShaderSampledRead
+      };
+    case vk::ImageLayout::eColorAttachmentOptimal:
+      return LayoutAccess{
+        .stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        .access = vk::AccessFlagBits2::eColorAttachmentWrite
+      };
+    default:
+      // eUndefined: chain with the acquire semaphore wait, which happens at color attachment output.
+      return LayoutAccess{
+        .stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        .access = {}
+      };
   }
 }
 
-Result<std::unique_ptr<VulkanRenderer>> VulkanRenderer::create(RenderingContext& context, void* native_window_handle,
-                                                               uint32_t window_width, uint32_t window_height) {
-  std::unique_ptr<VulkanRenderer> renderer(new VulkanRenderer());
+} // namespace
 
-  renderer->asset_manager = context.resources_context->asset_manager;
-  renderer->material_pool = context.resources_context->material_pool;
-  renderer->frames_rendered = std::make_unique<Counter>();
+VulkanRenderer::VulkanRenderer(const RenderingContext& context) : 
+  asset_manager(context.resources_context->asset_manager),
+  material_pool(context.resources_context->material_pool) {}
 
-  // 1. Initialize Subsystems
-  auto r_context = VulkanContext::create(native_window_handle);
-  if (!r_context) return mole::fail(r_context.error());
-  renderer->vk_context = std::move(r_context).value();
-  std::cout << "Vulkan Context created successfully" << std::endl;
+VulkanRenderer::~VulkanRenderer() {
+  // Waits return in finite time even on a lost device, so this is always safe.
+  if (vk_context) {
+    (void)vk_context->get_logical_device().waitIdle();
+  }
+}
 
-  auto r_allocator = VulkanMemoryAllocator::create(*renderer->vk_context);
-  if (!r_allocator) return mole::fail(r_allocator.error());
-  renderer->memory_allocator = std::move(r_allocator).value();
-  std::cout << "VMA Allocator created successfully" << std::endl;
-
-  auto r_swapchain = VulkanSwapchain::create(*renderer->vk_context, window_width, window_height);
-  if (!r_swapchain) return mole::fail(r_swapchain.error());
-  renderer->swapchain = std::move(r_swapchain).value();
-  std::cout << "Swapchain created successfully" << std::endl;
-
-  // 2. Initialize Internal Renderer State
-  auto r_create_command_pool = renderer->create_command_pool();
-  if (!r_create_command_pool) return mole::fail(r_create_command_pool.error());
-
-  auto r_material_handler = VulkanMaterialHandler::create(*renderer->vk_context, *renderer->memory_allocator,
-                                                          *renderer->frames_rendered, context);
-  if (!r_material_handler) return mole::fail(r_material_handler.error());
-  renderer->material_handler = std::move(r_material_handler).value();
-  std::cout << "Material Handler created successfully" << std::endl;
-
-  auto r_create_desc_set_layot = renderer->create_descriptor_set_layout();
-  if (!r_create_desc_set_layot) return mole::fail(r_create_desc_set_layot.error());
-  std::cout << "Descriptor set layout created successfully" << std::endl;
-
-  renderer->pipeline_cache = std::make_unique<VulkanPipelineCache>(
-      *renderer->swapchain, *renderer->vk_context, *renderer->material_handler, renderer->descriptor_set_layout);
-  std::cout << "Pipeline created successfully" << std::endl;
-
-  auto r_create_frame_data = renderer->create_frame_data();
-  if (!r_create_frame_data) return mole::fail(r_create_frame_data.error());
-
-  std::cout << "Vulkan Renderer initialized successfully" << std::endl;
-
+Result<std::unique_ptr<VulkanRenderer>> VulkanRenderer::create(RenderingContext& context) {
+  std::unique_ptr<VulkanRenderer> renderer(new VulkanRenderer(context));
+  MOLE_TRY(renderer->init(context));
   return std::move(renderer);
 }
 
+Result<void> VulkanRenderer::init(RenderingContext& context) {
+  frames_rendered = std::make_unique<Counter>();
+
+  MOLE_TRY_ASSIGN(vk_context, VulkanContext::create());
+  std::cout << "Vulkan Context created successfully" << std::endl;
+
+  MOLE_TRY_ASSIGN(memory_allocator, VulkanMemoryAllocator::create(*vk_context));
+  std::cout << "VMA Allocator created successfully" << std::endl;
+
+  MOLE_TRY(create_command_pool());
+
+  MOLE_TRY_ASSIGN(material_handler, VulkanMaterialHandler::create(*vk_context, *memory_allocator, *frames_rendered, context));
+  std::cout << "Material Handler created successfully" << std::endl;
+
+  MOLE_TRY(create_descriptor_set_layout());
+
+  pipeline_cache = std::make_unique<VulkanPipelineCache>(*vk_context, *material_handler, descriptor_set_layout);
+
+  MOLE_TRY(create_frame_data());
+
+  std::cout << "Vulkan Renderer initialized successfully" << std::endl;
+  return mole::ok();
+}
+
 Result<void> VulkanRenderer::create_command_pool() {
-  vk::CommandPoolCreateInfo pool_info{.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-                                      .queueFamilyIndex = vk_context->get_graphics_queue_index()};
+  vk::CommandPoolCreateInfo pool_info{
+    .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+    .queueFamilyIndex = vk_context->get_graphics_queue_index()
+  };
 
   auto vkr_create_command_pool = vk_context->get_logical_device().createCommandPool(pool_info);
   if (vkr_create_command_pool.result != vk::Result::eSuccess) {
@@ -119,22 +139,30 @@ Result<void> VulkanRenderer::create_command_pool() {
 }
 
 Result<void> VulkanRenderer::create_descriptor_set_layout() {
-  vk::DescriptorSetLayoutBinding ubo_binding{.binding = 0,
-                                             .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                             .descriptorCount = 1,
-                                             .stageFlags = vk::ShaderStageFlagBits::eVertex,
-                                             .pImmutableSamplers = nullptr};
+  vk::DescriptorSetLayoutBinding ubo_binding{
+    .binding = 0,
+    .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
+    .descriptorCount = 1,
+    .stageFlags = vk::ShaderStageFlagBits::eVertex,
+    .pImmutableSamplers = nullptr
+  };
 
-  vk::DescriptorSetLayoutBinding ssbo_binding = {
-      .binding = 1,
-      .descriptorType = vk::DescriptorType::eStorageBuffer, // <--- Storage Buffer!
-      .descriptorCount = 1,
-      .stageFlags = vk::ShaderStageFlagBits::eVertex};
+  vk::DescriptorSetLayoutBinding ssbo_binding{
+    .binding = 1,
+    .descriptorType = vk::DescriptorType::eStorageBuffer,
+    .descriptorCount = 1,
+    .stageFlags = vk::ShaderStageFlagBits::eVertex
+  };
 
-  std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {ubo_binding, ssbo_binding};
+  std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {
+    ubo_binding,
+    ssbo_binding
+  };
 
-  vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_info = {
-      .bindingCount = static_cast<uint32_t>(bindings.size()), .pBindings = bindings.data()};
+  vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_info{
+    .bindingCount = static_cast<uint32_t>(bindings.size()),
+    .pBindings = bindings.data()
+  };
 
   auto vkr_create_desc_set_layout =
       vk_context->get_logical_device().createDescriptorSetLayout(descriptor_set_layout_info);
@@ -149,16 +177,30 @@ Result<void> VulkanRenderer::create_descriptor_set_layout() {
 Result<void> VulkanRenderer::create_frame_data() {
   frames.resize(MAX_FRAMES_IN_FLIGHT);
 
-  // 1. Create Descriptor Pool for UBOs (Set 0)
-  std::array<vk::DescriptorPoolSize, 2> pool_sizes = {
-      vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBuffer, .descriptorCount = MAX_FRAMES_IN_FLIGHT},
-      vk::DescriptorPoolSize{.type = vk::DescriptorType::eStorageBuffer, // <--- Add this!
-                             .descriptorCount = MAX_FRAMES_IN_FLIGHT}};
+  // One UBO slot per pass, aligned for dynamic offsets
+  const size_t alignment = vk_context->get_physical_device().getProperties().limits.minUniformBufferOffsetAlignment;
+  ubo_stride = sizeof(ViewData);
+  if (alignment > 0) {
+    ubo_stride = (ubo_stride + alignment - 1) & ~(alignment - 1);
+  }
 
-  vk::DescriptorPoolCreateInfo pool_info{.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-                                         .maxSets = MAX_FRAMES_IN_FLIGHT,
-                                         .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
-                                         .pPoolSizes = pool_sizes.data()};
+  std::array<vk::DescriptorPoolSize, 2> pool_sizes = {
+    vk::DescriptorPoolSize{
+      .type = vk::DescriptorType::eUniformBufferDynamic,
+      .descriptorCount = MAX_FRAMES_IN_FLIGHT
+    },
+    vk::DescriptorPoolSize{
+      .type = vk::DescriptorType::eStorageBuffer,
+      .descriptorCount = MAX_FRAMES_IN_FLIGHT
+    }
+  };
+
+  vk::DescriptorPoolCreateInfo pool_info{
+    .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+    .maxSets = MAX_FRAMES_IN_FLIGHT,
+    .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
+    .pPoolSizes = pool_sizes.data()
+  };
 
   auto vkr_ubo_pool = vk_context->get_logical_device().createDescriptorPool(pool_info);
   if (vkr_ubo_pool.result != vk::Result::eSuccess) {
@@ -166,49 +208,42 @@ Result<void> VulkanRenderer::create_frame_data() {
   }
   ubo_descriptor_pool = std::move(vkr_ubo_pool.value);
 
-  // 2. Allocate Command Buffers
-  vk::CommandBufferAllocateInfo alloc_info{.commandPool = *command_pool,
-                                           .level = vk::CommandBufferLevel::ePrimary,
-                                           .commandBufferCount = MAX_FRAMES_IN_FLIGHT};
+  vk::CommandBufferAllocateInfo alloc_info{
+    .commandPool = *command_pool,
+    .level = vk::CommandBufferLevel::ePrimary,
+    .commandBufferCount = MAX_FRAMES_IN_FLIGHT
+  };
 
   auto vkr_cmd_buffers = vk_context->get_logical_device().allocateCommandBuffers(alloc_info);
   if (vkr_cmd_buffers.result != vk::Result::eSuccess) {
     return mole::fail("Failed to allocate command buffers");
   }
 
-  // 3. Initialize Per-Frame Data
   for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
     FrameData& frame = frames[i];
 
-    // Sync Objects
-    auto vkr_image_avail = vk_context->get_logical_device().createSemaphore(vk::SemaphoreCreateInfo());
-    if (vkr_image_avail.result != vk::Result::eSuccess) return mole::fail("Failed to create semaphore");
-    frame.image_available_semaphore = std::move(vkr_image_avail.value);
-
-    auto vkr_fence =
-        vk_context->get_logical_device().createFence(vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
+    auto vkr_fence = vk_context->get_logical_device().createFence(vk::FenceCreateInfo{
+      .flags = vk::FenceCreateFlagBits::eSignaled
+    });
     if (vkr_fence.result != vk::Result::eSuccess) return mole::fail("Failed to create fence");
     frame.in_flight_fence = std::move(vkr_fence.value);
 
-    // Command Buffer
     frame.command_buffer = std::move(vkr_cmd_buffers.value[i]);
 
-    // Uniform Buffer
-    auto ubo_res = memory_allocator->create_buffer(vk::BufferUsageFlagBits::eUniformBuffer, sizeof(ViewData));
-    if (!ubo_res) return mole::fail(ubo_res.error());
-    frame.uniform_buffer = std::move(ubo_res).value();
-    frame.uniform_buffer_mapped = frame.uniform_buffer.getAllocation().getInfo().pMappedData;
+    MOLE_TRY_ASSIGN(frame.uniform_buffer, memory_allocator->create_buffer(vk::BufferUsageFlagBits::eUniformBuffer,
+                                                                          ubo_stride * MAX_PASSES_PER_FRAME));
+    frame.uniform_buffer_mapped = static_cast<std::byte*>(frame.uniform_buffer.getAllocation().getInfo().pMappedData);
 
-    auto r_create_quad_buf =
-        memory_allocator->create_buffer(vk::BufferUsageFlagBits::eStorageBuffer, sizeof(Quad) * MAX_QUADS);
-    if (!r_create_quad_buf) return mole::fail(r_create_quad_buf.error());
-    frame.quad_buffer = std::move(r_create_quad_buf).value();
+    MOLE_TRY_ASSIGN(frame.quad_buffer,
+                    memory_allocator->create_buffer(vk::BufferUsageFlagBits::eStorageBuffer, sizeof(Quad) * MAX_QUADS));
     frame.quad_buffer_mapped = static_cast<Quad*>(frame.quad_buffer.getAllocation().getInfo().pMappedData);
 
-    // Allocate Set 0 for this frame
     vk::DescriptorSetLayout raw_ubo_layout = *descriptor_set_layout;
     vk::DescriptorSetAllocateInfo desc_alloc_info{
-        .descriptorPool = *ubo_descriptor_pool, .descriptorSetCount = 1, .pSetLayouts = &raw_ubo_layout};
+      .descriptorPool = *ubo_descriptor_pool,
+      .descriptorSetCount = 1,
+      .pSetLayouts = &raw_ubo_layout
+    };
 
     auto vkr_desc_set = vk_context->get_logical_device().allocateDescriptorSets(desc_alloc_info);
     if (vkr_desc_set.result != vk::Result::eSuccess) {
@@ -216,136 +251,229 @@ Result<void> VulkanRenderer::create_frame_data() {
     }
     frame.descriptor_set = std::move(vkr_desc_set.value[0]);
 
-    // Point Set 0 to this frame's uniform buffer
-    vk::DescriptorBufferInfo ubo_info{.buffer = *frame.uniform_buffer, .offset = 0, .range = sizeof(ViewData)};
+    vk::DescriptorBufferInfo ubo_info{
+      .buffer = *frame.uniform_buffer,
+      .offset = 0,
+      .range = sizeof(ViewData)
+    };
 
-    vk::DescriptorBufferInfo ssbo_info{.buffer = *frame.quad_buffer, .offset = 0, .range = sizeof(Quad) * MAX_QUADS};
+    vk::DescriptorBufferInfo ssbo_info{
+      .buffer = *frame.quad_buffer,
+      .offset = 0,
+      .range = sizeof(Quad) * MAX_QUADS
+    };
 
     std::array<vk::WriteDescriptorSet, 2> descriptor_writes = {
-        vk::WriteDescriptorSet{.dstSet = *frame.descriptor_set,
-                               .dstBinding = 0,
-                               .dstArrayElement = 0,
-                               .descriptorCount = 1,
-                               .descriptorType = vk::DescriptorType::eUniformBuffer,
-                               .pBufferInfo = &ubo_info},
-        vk::WriteDescriptorSet{.dstSet = *frame.descriptor_set,
-                               .dstBinding = 1,
-                               .dstArrayElement = 0,
-                               .descriptorCount = 1,
-                               .descriptorType = vk::DescriptorType::eStorageBuffer,
-                               .pBufferInfo = &ssbo_info}};
+      vk::WriteDescriptorSet{
+        .dstSet = *frame.descriptor_set,
+        .dstBinding = 0,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
+        .pBufferInfo = &ubo_info
+      },
+      vk::WriteDescriptorSet{
+        .dstSet = *frame.descriptor_set,
+        .dstBinding = 1,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = vk::DescriptorType::eStorageBuffer,
+        .pBufferInfo = &ssbo_info
+      }
+    };
 
     vk_context->get_logical_device().updateDescriptorSets(descriptor_writes, nullptr);
-  }
-
-  // 4. Render Finished Semaphores (Tied to Swapchain image count)
-  render_finished_semaphores.clear();
-  for (size_t i = 0; i < swapchain->get_image_count(); i++) {
-    auto vkr_render_fin = vk_context->get_logical_device().createSemaphore(vk::SemaphoreCreateInfo());
-    if (vkr_render_fin.result != vk::Result::eSuccess) return mole::fail("Failed to create render finished semaphore");
-    render_finished_semaphores.push_back(std::move(vkr_render_fin.value));
   }
 
   return mole::ok();
 }
 
-void VulkanRenderer::begin_frame() {
-  if (needs_framebuffer_resize_ || is_context_lost_) return;
+Result<void> VulkanRenderer::begin_frame() {
+  if (in_frame) return mole::fail("begin_frame called while a frame is already in progress");
 
-  FrameData& frame = frames[current_frame_];
+  FrameData& frame = frames[current_frame];
+  const vk::raii::Device& device = vk_context->get_logical_device();
 
   // 1. Wait for the GPU to finish with this frame's resources
-  auto vkr_fence = vk_context->get_logical_device().waitForFences(*frame.in_flight_fence, vk::True, UINT64_MAX);
-  if (vkr_fence == vk::Result::eErrorDeviceLost) {
-    is_context_lost_ = true;
-    return;
+  if (device.waitForFences(*frame.in_flight_fence, vk::True, UINT64_MAX) != vk::Result::eSuccess) {
+    return mole::fail("Failed to wait for the in-flight fence (device lost?)");
   }
-  vk_context->get_logical_device().resetFences(*frame.in_flight_fence);
 
-  // 2. Acquire the next image to draw onto (Your "target_texture" logic)
-  auto r_acquire = swapchain->acquire_next_image(frame.image_available_semaphore);
-  if (!r_acquire) {
-    needs_framebuffer_resize_ = true;
-    return;
+  // 2. Release render targets no in-flight frame can reference anymore
+  std::erase_if(retired_render_targets, [this](const RetiredRenderTarget& retired) {
+    return retired.retire_after_frame <= frames_rendered->count;
+  });
+
+  // 3. Reset only once we're sure this frame will be submitted in end_frame
+  if (device.resetFences(*frame.in_flight_fence) != vk::Result::eSuccess) {
+    return mole::fail("Failed to reset the in-flight fence");
   }
-  current_image_index_ = r_acquire.value();
 
-  // 3. Begin the Vulkan Command Buffer for this frame
   if (frame.command_buffer.begin({}) != vk::Result::eSuccess) {
-    std::cerr << "Failed to begin command buffer\n";
-    return;
+    return mole::fail("Failed to begin the frame command buffer");
   }
 
-  // 4. Transition the target texture so we can render to it
-  transition_image_layout(
-      frame.command_buffer, swapchain->get_images()[current_image_index_], vk::ImageLayout::eUndefined,
-      vk::ImageLayout::eColorAttachmentOptimal, {}, vk::AccessFlagBits2::eColorAttachmentWrite,
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eColorAttachmentOutput);
+  pass_cursor = 0;
+  quad_cursor = 0;
+  acquired_presenters.clear();
+  in_frame = true;
+  return mole::ok();
 }
 
-void VulkanRenderer::begin_pass(const ViewData& view_data) {
-  if (needs_framebuffer_resize_ || is_context_lost_) return;
-  current_view_data_ = view_data;
+Result<bool> VulkanRenderer::begin_pass(RenderTargetID target, const PassOptions& options) {
+  if (!in_frame) return mole::fail("begin_pass called outside of a frame");
+  if (active_pass) return mole::fail("begin_pass called while another pass is open");
+
+  RenderTargetEntry* entry = render_targets.get(target);
+  if (!entry) return mole::fail("begin_pass called with an invalid or stale RenderTargetID");
+
+  ActivePass pass{
+    .target = target,
+    .view_data = options.view_data
+  };
+  vk::ImageView image_view;
+  vk::Extent2D extent;
+
+  // 1. Resolve the target
+  if (auto* offscreen = std::get_if<std::unique_ptr<VulkanRenderTarget>>(entry)) {
+    VulkanRenderTarget& render_target = **offscreen;
+    pass.image = render_target.get_image();
+    pass.format = render_target.get_format();
+    pass.layout = &render_target.current_layout;
+    pass.is_offscreen = true;
+    image_view = render_target.get_image_view();
+    extent = render_target.get_extent();
+  } else {
+    const PresenterID presenter_id = std::get<PresenterID>(*entry);
+    PresenterEntry* presenter_entry = presenters.get(presenter_id);
+    assert(presenter_entry && "A presenter RT must always reference a live presenter");
+    VulkanPresenter& presenter = *presenter_entry->presenter;
+
+    const bool was_acquired = presenter.is_acquired();
+    MOLE_TRY_ASSIGN(bool renderable, presenter.acquire(current_frame));
+    if (!renderable) {
+      return false;
+    }
+    if (!was_acquired) {
+      acquired_presenters.push_back(presenter_id);
+    }
+
+    pass.image = presenter.get_acquired_image();
+    pass.format = presenter.get_format();
+    pass.layout = &presenter.get_acquired_image_layout();
+    pass.is_offscreen = false;
+    image_view = presenter.get_acquired_image_view();
+    extent = presenter.get_extent();
+  }
+
+  if (extent.width == 0 || extent.height == 0) {
+    return false;
+  }
+
+  FrameData& frame = frames[current_frame];
+
+  // 2. Transition to color attachment (contents are discarded when clearing)
+  const vk::ImageLayout old_layout = options.clear_color ? vk::ImageLayout::eUndefined : *pass.layout;
+  const LayoutAccess src = get_src_access(*pass.layout);
+  transition_image_layout(frame.command_buffer, pass.image, old_layout, vk::ImageLayout::eColorAttachmentOptimal,
+                          src.access,
+                          vk::AccessFlagBits2::eColorAttachmentWrite | vk::AccessFlagBits2::eColorAttachmentRead,
+                          src.stage, vk::PipelineStageFlagBits2::eColorAttachmentOutput);
+  *pass.layout = vk::ImageLayout::eColorAttachmentOptimal;
+
+  // 3. Begin rendering
+  const glm::vec4 clear = options.clear_color.value_or(glm::vec4(0.0f));
+  vk::RenderingAttachmentInfo attachment_info{
+    .imageView = image_view,
+    .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+    .loadOp = options.clear_color ? vk::AttachmentLoadOp::eClear : vk::AttachmentLoadOp::eLoad,
+    .storeOp = vk::AttachmentStoreOp::eStore,
+    .clearValue = vk::ClearColorValue(clear.r, clear.g, clear.b, clear.a)
+  };
+
+  vk::RenderingInfo rendering_info{
+    .renderArea = {
+      .offset = {
+        0,
+        0
+      },
+      .extent = extent
+    },
+    .layerCount = 1,
+    .colorAttachmentCount = 1,
+    .pColorAttachments = &attachment_info
+  };
+
+  frame.command_buffer.beginRendering(rendering_info);
+
+  // 4. Dynamic viewport/scissor from the target extent (negative height flips Y)
+  frame.command_buffer.setViewport(0, vk::Viewport(0.0f, static_cast<float>(extent.height),
+                                                   static_cast<float>(extent.width),
+                                                   -static_cast<float>(extent.height), 0.0f, 1.0f));
+  frame.command_buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
+
+  // 5. Remember the pass
+  active_pass = pass;
+  return true;
 }
 
-void VulkanRenderer::submit(const RenderQuadCommand render_command) { pending_commands.push_back(render_command); }
+void VulkanRenderer::submit(const RenderQuadCommand& render_command) { pending_commands.push_back(render_command); }
 
 void VulkanRenderer::submit(const std::vector<RenderQuadCommand>& render_commands) {
   pending_commands.insert(pending_commands.end(), render_commands.begin(), render_commands.end());
 }
 
-void VulkanRenderer::end_pass() {
-  if (needs_framebuffer_resize_ || is_context_lost_ || swapchain->get_extent().width == 0 ||
-      swapchain->get_extent().height == 0) {
-    pending_commands.clear();
+Result<void> VulkanRenderer::end_pass() {
+  if (!active_pass) return mole::fail("end_pass called without an open pass");
+
+  FrameData& frame = frames[current_frame];
+  const ActivePass pass = *active_pass;
+  active_pass.reset();
+
+  if (!pending_commands.empty()) {
+    // Per-material problems are logged by the handler; only Vulkan failures come back here.
+    MOLE_TRY(material_handler->prepare_materials(get_needed_pass_materials()));
+    build_batches();
+    record_draws(frame, pass);
+  }
+
+  frame.command_buffer.endRendering();
+
+  if (pass.is_offscreen) {
+    transition_image_layout(frame.command_buffer, pass.image, vk::ImageLayout::eColorAttachmentOptimal,
+                            vk::ImageLayout::eShaderReadOnlyOptimal, vk::AccessFlagBits2::eColorAttachmentWrite,
+                            vk::AccessFlagBits2::eShaderSampledRead,
+                            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                            vk::PipelineStageFlagBits2::eFragmentShader);
+    *pass.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  }
+
+  return mole::ok();
+}
+
+void VulkanRenderer::record_draws(FrameData& frame, const ActivePass& pass) {
+  if (quads.empty()) return;
+
+  if (pass_cursor >= MAX_PASSES_PER_FRAME) {
+    std::cerr << "VulkanRenderer: more than " << MAX_PASSES_PER_FRAME << " passes with draws this frame, dropping pass"
+              << std::endl;
     return;
   }
-  if (pending_commands.empty()) return;
-
-  FrameData& frame = frames[current_frame_];
-
-  // --- 1. CPU PHASE: FLUSH THE COMMAND QUEUE ---
-  std::vector<MaterialID> pass_materials = get_needed_pass_materials();
-  auto r_prepare_materials = material_handler->prepare_materials(pass_materials);
-  if (!r_prepare_materials) {
-    std::cerr << "VulkanRenderer::end_pass failed to prepare materials: " << r_prepare_materials.error() << std::endl;
+  if (quad_cursor + quads.size() > MAX_QUADS) {
+    std::cerr << "VulkanRenderer: frame exceeds " << MAX_QUADS << " quads, dropping pass" << std::endl;
+    return;
   }
 
-  // Build batches (This internally calls pending_commands.clear(), giving you a fresh queue)
-  build_batches();
-
-  // Update CPU-mapped GPU buffers
-  update_ubo(current_view_data_, frame);
-  update_quad_ssbo(frame);
-
-  // --- 2. GPU PHASE: RECORD RENDER COMMANDS ---
-
-  vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 1.0f, 0.5f, 1.0f);
-  vk::RenderingAttachmentInfo attachmentInfo = {
-      .imageView = *swapchain->get_image_views()[current_image_index_], // Or your custom target_texture View
-      .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-      .loadOp = vk::AttachmentLoadOp::eClear,
-      .storeOp = vk::AttachmentStoreOp::eStore,
-      .clearValue = clearColor};
-
-  vk::RenderingInfo renderingInfo = {.renderArea = {.offset = {0, 0}, .extent = swapchain->get_extent()},
-                                     .layerCount = 1,
-                                     .colorAttachmentCount = 1,
-                                     .pColorAttachments = &attachmentInfo};
-
-  frame.command_buffer.beginRendering(renderingInfo);
-
-  frame.command_buffer.setViewport(0, vk::Viewport(0.0f, static_cast<float>(swapchain->get_extent().height),
-                                                   static_cast<float>(swapchain->get_extent().width),
-                                                   -static_cast<float>(swapchain->get_extent().height), 0.0f, 1.0f));
-  frame.command_buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapchain->get_extent()));
+  // Each pass gets its own UBO slot and quad range so later passes don't overwrite earlier ones.
+  const uint32_t ubo_offset = static_cast<uint32_t>(pass_cursor * ubo_stride);
+  std::memcpy(frame.uniform_buffer_mapped + ubo_offset, &pass.view_data, sizeof(ViewData));
+  std::memcpy(frame.quad_buffer_mapped + quad_cursor, quads.data(), sizeof(Quad) * quads.size());
 
   std::array<vk::DescriptorSet, 2> sets = {
-      *frame.descriptor_set,                 // Set 0: UBO + Quad SSBO
-      material_handler->get_descriptor_set() // Set 1: Bindless Textures + Material SSBO
+    *frame.descriptor_set,                 // Set 0: UBO + Quad SSBO
+    material_handler->get_descriptor_set() // Set 1: Bindless Textures + Material SSBO
   };
 
-  // Issue draw calls from batches
   for (const auto& batch : batches) {
     if (batch.quad_count == 0) continue;
 
@@ -357,7 +485,7 @@ void VulkanRenderer::end_pass() {
       continue;
     }
 
-    auto r_get_pipeline = pipeline_cache->get(r_vert.value(), r_frag.value());
+    auto r_get_pipeline = pipeline_cache->get(r_vert.value(), r_frag.value(), pass.format);
     if (!r_get_pipeline) {
       std::cerr << "VulkanRenderer::end_pass failed to get pipeline: " << r_get_pipeline.error() << std::endl;
       continue;
@@ -366,110 +494,244 @@ void VulkanRenderer::end_pass() {
     VulkanPipeline* pipeline = r_get_pipeline.value();
     pipeline->bind(frame.command_buffer);
 
-    frame.command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline->get_layout(), 0, sets,
-                                            nullptr);
+    frame.command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline->get_layout(), 0, sets, ubo_offset);
 
-    frame.command_buffer.draw(batch.quad_count * 6, 1, batch.first_quad * 6, 0);
+    const uint32_t first_vertex = static_cast<uint32_t>(quad_cursor + batch.first_quad) * 6;
+    frame.command_buffer.draw(batch.quad_count * 6, 1, first_vertex, 0);
   }
 
-  frame.command_buffer.endRendering();
+  pass_cursor++;
+  quad_cursor += quads.size();
 }
 
 std::vector<MaterialID> VulkanRenderer::get_needed_pass_materials() {
   std::vector<MaterialID> needed_materials;
-  needed_materials.reserve(this->pending_commands.size());
-  for (const auto& cmd : this->pending_commands) {
+  needed_materials.reserve(pending_commands.size());
+  for (const auto& cmd : pending_commands) {
     needed_materials.push_back(cmd.material_id);
   }
 
   std::sort(needed_materials.begin(), needed_materials.end(),
             [](const MaterialID& a, const MaterialID& b) { return a.id < b.id; });
   needed_materials.erase(std::unique(needed_materials.begin(), needed_materials.end()), needed_materials.end());
-  return std::move(needed_materials);
+  return needed_materials;
 }
 
-void VulkanRenderer::end_frame() {
-  if (needs_framebuffer_resize_ || is_context_lost_) return;
+Result<void> VulkanRenderer::end_frame() {
+  if (!in_frame) return mole::fail("end_frame called without begin_frame");
+  if (active_pass) return mole::fail("end_frame called while a pass is open");
 
-  FrameData& frame = frames[current_frame_];
+  FrameData& frame = frames[current_frame];
+  in_frame = false;
 
-  // 1. Transition image to presentation layout
-  transition_image_layout(
-      frame.command_buffer, swapchain->get_images()[current_image_index_], vk::ImageLayout::eColorAttachmentOptimal,
-      vk::ImageLayout::ePresentSrcKHR, vk::AccessFlagBits2::eColorAttachmentWrite, {},
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe);
+  std::vector<vk::Semaphore> wait_semaphores;
+  std::vector<vk::PipelineStageFlags> wait_stages;
+  std::vector<vk::Semaphore> signal_semaphores;
+  std::vector<vk::SwapchainKHR> swapchains;
+  std::vector<uint32_t> image_indices;
 
-  // 2. End the command buffer
+  // 1. Transition every acquired backbuffer to present, then submit
+  for (PresenterID presenter_id : acquired_presenters) {
+    VulkanPresenter& presenter = *presenters.get(presenter_id)->presenter;
+    vk::ImageLayout& layout = presenter.get_acquired_image_layout();
+    transition_image_layout(frame.command_buffer, presenter.get_acquired_image(), layout,
+                            vk::ImageLayout::ePresentSrcKHR, vk::AccessFlagBits2::eColorAttachmentWrite, {},
+                            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                            vk::PipelineStageFlagBits2::eBottomOfPipe);
+    layout = vk::ImageLayout::ePresentSrcKHR;
+
+    wait_semaphores.push_back(*presenter.get_image_available(current_frame));
+    wait_stages.push_back(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+    signal_semaphores.push_back(*presenter.get_render_finished());
+    swapchains.push_back(presenter.get_swapchain());
+    image_indices.push_back(presenter.get_acquired_image_index());
+  }
+
   if (frame.command_buffer.end() != vk::Result::eSuccess) {
-    std::cerr << "Failed to end command buffer\n";
-    return;
+    return mole::fail("Failed to end the frame command buffer");
   }
 
-  // 3. Submit the frame to the GPU queue
-  vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-  const vk::SubmitInfo submitInfo{.waitSemaphoreCount = 1,
-                                  .pWaitSemaphores = &*frame.image_available_semaphore,
-                                  .pWaitDstStageMask = &waitDestinationStageMask,
-                                  .commandBufferCount = 1,
-                                  .pCommandBuffers = &*frame.command_buffer,
-                                  .signalSemaphoreCount = 1,
-                                  .pSignalSemaphores = &*render_finished_semaphores[current_image_index_]};
+  const vk::SubmitInfo submit_info{
+    .waitSemaphoreCount = static_cast<uint32_t>(wait_semaphores.size()),
+    .pWaitSemaphores = wait_semaphores.data(),
+    .pWaitDstStageMask = wait_stages.data(),
+    .commandBufferCount = 1,
+    .pCommandBuffers = &*frame.command_buffer,
+    .signalSemaphoreCount = static_cast<uint32_t>(signal_semaphores.size()),
+    .pSignalSemaphores = signal_semaphores.data()
+  };
 
-  vk_context->get_graphics_queue().submit(submitInfo, *frame.in_flight_fence);
-
-  // 4. Present it to the screen
-  auto r_present = swapchain->present(vk_context->get_graphics_queue(),
-                                      render_finished_semaphores[current_image_index_], current_image_index_);
-  if (!r_present) {
-    needs_framebuffer_resize_ = true;
+  if (vk_context->get_graphics_queue().submit(submit_info, *frame.in_flight_fence) != vk::Result::eSuccess) {
+    return mole::fail("Failed to submit the frame (device lost?)");
   }
+
+  // 2. Present every presenter drawn into this frame with one call
+  std::optional<std::string> fatal_error;
+  if (!swapchains.empty()) {
+    std::vector<vk::Result> present_results(swapchains.size(), vk::Result::eSuccess);
+    const vk::PresentInfoKHR present_info{
+      .waitSemaphoreCount = static_cast<uint32_t>(signal_semaphores.size()),
+      .pWaitSemaphores = signal_semaphores.data(),
+      .swapchainCount = static_cast<uint32_t>(swapchains.size()),
+      .pSwapchains = swapchains.data(),
+      .pImageIndices = image_indices.data(),
+      .pResults = present_results.data()
+    };
+
+    const vk::Result present_result = vk_context->get_graphics_queue().presentKHR(present_info);
+    for (size_t i = 0; i < acquired_presenters.size(); ++i) {
+      switch (to_swapchain_status(present_results[i])) {
+        case ESwapchainStatus::Ok:
+          break;
+        case ESwapchainStatus::Suboptimal:
+        case ESwapchainStatus::OutOfDate:
+          presenters.get(acquired_presenters[i])->presenter->mark_needs_recreate();
+          break;
+        case ESwapchainStatus::SurfaceLost:
+          fatal_error = "Surface lost while presenting";
+          break;
+        case ESwapchainStatus::DeviceLost:
+          fatal_error = "Device lost while presenting";
+          break;
+        case ESwapchainStatus::Error:
+          fatal_error = "Failed to present";
+          break;
+      }
+    }
+    if (!fatal_error && to_swapchain_status(present_result) >= ESwapchainStatus::SurfaceLost) {
+      fatal_error = "Failed to present";
+    }
+  }
+
+  // 3. Advance the frame
+  for (PresenterID presenter_id : acquired_presenters) {
+    presenters.get(presenter_id)->presenter->release();
+  }
+  acquired_presenters.clear();
 
   frames_rendered->count++;
   material_handler->free_unused_materials();
   move_to_next_frame();
-}
 
-void VulkanRenderer::update_ubo(const ViewData& view_data, FrameData& frame) {
-  memcpy(frame.uniform_buffer_mapped, &view_data, sizeof(view_data));
-}
-
-void VulkanRenderer::update_quad_ssbo(FrameData& frame) {
-  std::memcpy(frame.quad_buffer_mapped, quads.data(), sizeof(mole::Quad) * quads.size());
-}
-
-Result<void> VulkanRenderer::resize_framebuffer(uint32_t width, uint32_t height) {
-  if (width == 0 || height == 0) {
-    needs_framebuffer_resize_ = true;
-    return mole::ok();
-  }
-
-  const auto& physical_device = vk_context->get_physical_device();
-  const auto& surface = vk_context->get_surface();
-  auto caps_res = physical_device.getSurfaceCapabilitiesKHR(*surface);
-  if (caps_res.result == vk::Result::eSuccess) {
-    if (caps_res.value.currentExtent.width == 0 && caps_res.value.currentExtent.height == 0) {
-      needs_framebuffer_resize_ = true;
-      return mole::ok();
-    }
-  }
-
-  vk_context->get_logical_device().waitIdle();
-
-  auto r_recreate = swapchain->recreate(*vk_context, width, height);
-  if (!r_recreate) {
-    needs_framebuffer_resize_ = true;
-    return r_recreate;
-  }
-
-  render_finished_semaphores.clear();
-  for (size_t i = 0; i < swapchain->get_image_count(); i++) {
-    auto vkr_render_fin = vk_context->get_logical_device().createSemaphore(vk::SemaphoreCreateInfo());
-    if (vkr_render_fin.result != vk::Result::eSuccess) return mole::fail("Failed to create semaphore");
-    render_finished_semaphores.push_back(std::move(vkr_render_fin.value));
-  }
-
-  needs_framebuffer_resize_ = false;
+  if (fatal_error) return mole::fail(*fatal_error);
   return mole::ok();
+}
+
+Result<RenderTargetID> VulkanRenderer::create_render_target(const RenderTargetOptions& options) {
+  MOLE_TRY_ASSIGN(std::unique_ptr<VulkanRenderTarget> render_target, VulkanRenderTarget::create(*vk_context, *memory_allocator, options));
+  return render_targets.insert(RenderTargetEntry{std::move(render_target)});
+}
+
+Result<PresenterID> VulkanRenderer::create_presenter(const IWindow* window) {
+  MOLE_TRY_ASSIGN(std::unique_ptr<VulkanPresenter> presenter, VulkanPresenter::create(*vk_context, window));
+
+  const PresenterID presenter_id = presenters.insert(PresenterEntry{
+    .presenter = std::move(presenter),
+    .render_target = RenderTargetID::INVALID
+  });
+  presenters.get(presenter_id)->render_target = render_targets.insert(RenderTargetEntry{presenter_id});
+  return presenter_id;
+}
+
+Result<void> VulkanRenderer::resize(RenderTargetID target, uint32_t width, uint32_t height) {
+  RenderTargetEntry* entry = render_targets.get(target);
+  if (!entry) return mole::fail("resize called with an invalid or stale RenderTargetID");
+
+  auto* offscreen = std::get_if<std::unique_ptr<VulkanRenderTarget>>(entry);
+  if (!offscreen) return mole::fail("Presenter render targets can't be resized manually");
+  if (active_pass && active_pass->target == target) {
+    return mole::fail("resize called on the render target of the open pass");
+  }
+
+  const RenderTargetOptions options{
+    .width = width,
+    .height = height,
+    .format = (*offscreen)->get_options_format()
+  };
+  MOLE_TRY_ASSIGN(std::unique_ptr<VulkanRenderTarget> resized, VulkanRenderTarget::create(*vk_context, *memory_allocator, options));
+
+  retire(std::exchange(*offscreen, std::move(resized)));
+  return mole::ok();
+}
+
+Result<void> VulkanRenderer::destroy(RenderTargetID target) {
+  RenderTargetEntry* entry = render_targets.get(target);
+  if (!entry) return mole::fail("destroy called with an invalid or stale RenderTargetID");
+  if (!std::holds_alternative<std::unique_ptr<VulkanRenderTarget>>(*entry)) {
+    return mole::fail("Presenter render targets are destroyed together with their presenter");
+  }
+  if (active_pass && active_pass->target == target) {
+    return mole::fail("destroy called on the render target of the open pass");
+  }
+
+  std::optional<RenderTargetEntry> erased = render_targets.erase(target);
+  retire(std::get<std::unique_ptr<VulkanRenderTarget>>(std::move(*erased)));
+  return mole::ok();
+}
+
+Result<void> VulkanRenderer::destroy(PresenterID presenter) {
+  PresenterEntry* entry = presenters.get(presenter);
+  if (!entry) return mole::fail("destroy called with an invalid or stale PresenterID");
+  if (entry->presenter->is_acquired()) {
+    return mole::fail("destroy called on a presenter that was drawn into this frame");
+  }
+
+  if (vk_context->get_logical_device().waitIdle() != vk::Result::eSuccess) {
+    return mole::fail("Failed to wait for device idle before destroying a presenter");
+  }
+
+  (void)render_targets.erase(entry->render_target);
+  (void)presenters.erase(presenter);
+  return mole::ok();
+}
+
+void VulkanRenderer::retire(std::unique_ptr<VulkanRenderTarget> render_target) {
+  retired_render_targets.push_back(RetiredRenderTarget{
+    .retire_after_frame = frames_rendered->count + MAX_FRAMES_IN_FLIGHT,
+    .render_target = std::move(render_target)
+  });
+}
+
+RenderTargetID VulkanRenderer::get_render_target(PresenterID presenter) const {
+  const PresenterEntry* entry = presenters.get(presenter);
+  return entry ? entry->render_target : RenderTargetID::INVALID;
+}
+
+Result<RenderTargetInfo> VulkanRenderer::get_info(RenderTargetID target) const {
+  const RenderTargetEntry* entry = render_targets.get(target);
+  if (!entry) return mole::fail("Invalid or stale RenderTargetID");
+
+  vk::Extent2D extent;
+  vk::Format format;
+  if (const auto* offscreen = std::get_if<std::unique_ptr<VulkanRenderTarget>>(entry)) {
+    extent = (*offscreen)->get_extent();
+    format = (*offscreen)->get_format();
+  } else {
+    const VulkanPresenter& presenter = *presenters.get(std::get<PresenterID>(*entry))->presenter;
+    extent = presenter.get_extent();
+    format = presenter.get_format();
+  }
+
+  RenderTargetInfo info{
+    .width = extent.width,
+    .height = extent.height,
+    .native_format = static_cast<uint32_t>(format)
+  };
+  return info;
+}
+
+Result<PresenterInfo> VulkanRenderer::get_info(PresenterID presenter) const {
+  const PresenterEntry* entry = presenters.get(presenter);
+  if (!entry) return mole::fail("Invalid or stale PresenterID");
+
+  const VulkanPresenter& vk_presenter = *entry->presenter;
+  PresenterInfo info{
+    .width = vk_presenter.get_extent().width,
+    .height = vk_presenter.get_extent().height,
+    .image_count = vk_presenter.get_image_count(),
+    .native_format = static_cast<uint32_t>(vk_presenter.get_format())
+  };
+  return info;
 }
 
 void VulkanRenderer::transition_image_layout(vk::raii::CommandBuffer& cmd_buffer, vk::Image image,
@@ -477,38 +739,35 @@ void VulkanRenderer::transition_image_layout(vk::raii::CommandBuffer& cmd_buffer
                                              vk::AccessFlags2 src_access_mask, vk::AccessFlags2 dst_access_mask,
                                              vk::PipelineStageFlags2 src_stage_mask,
                                              vk::PipelineStageFlags2 dst_stage_mask) {
-  vk::ImageMemoryBarrier2 barrier = {
-      .srcStageMask = src_stage_mask,
-      .srcAccessMask = src_access_mask,
-      .dstStageMask = dst_stage_mask,
-      .dstAccessMask = dst_access_mask,
-      .oldLayout = old_layout,
-      .newLayout = new_layout,
-      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .image = image,
-      .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = 1}};
+  vk::ImageMemoryBarrier2 barrier{
+    .srcStageMask = src_stage_mask,
+    .srcAccessMask = src_access_mask,
+    .dstStageMask = dst_stage_mask,
+    .dstAccessMask = dst_access_mask,
+    .oldLayout = old_layout,
+    .newLayout = new_layout,
+    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .image = image,
+    .subresourceRange = {
+      .aspectMask = vk::ImageAspectFlagBits::eColor,
+      .levelCount = 1,
+      .layerCount = 1
+    }
+  };
 
-  vk::DependencyInfo dependency_info = {.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier};
+  vk::DependencyInfo dependency_info{
+    .imageMemoryBarrierCount = 1,
+    .pImageMemoryBarriers = &barrier
+  };
 
   cmd_buffer.pipelineBarrier2(dependency_info);
 }
 
-inline void VulkanRenderer::move_to_next_frame() { current_frame_ = (current_frame_ + 1) % MAX_FRAMES_IN_FLIGHT; }
+inline void VulkanRenderer::move_to_next_frame() { current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT; }
 
-bool VulkanRenderer::is_context_lost() const noexcept { return is_context_lost_; }
-bool VulkanRenderer::needs_framebuffer_resize() const noexcept { return needs_framebuffer_resize_; }
-
-uint32_t VulkanRenderer::get_framebuffer_width() const noexcept {
-  return swapchain ? swapchain->get_extent().width : 0;
-}
-
-uint32_t VulkanRenderer::get_framebuffer_height() const noexcept {
-  return swapchain ? swapchain->get_extent().height : 0;
-}
-
-void* VulkanRenderer::get_native_handle(ERendererNativeHandle handle_type) const {
-  switch (handle_type) {
+void* VulkanRenderer::get_native_handle(ERendererNativeHandle type) const {
+  switch (type) {
     case ERendererNativeHandle::Instance:
       return to_native_handle_ptr(static_cast<VkInstance>(*vk_context->get_instance()));
     case ERendererNativeHandle::PhysicalAdapter:
@@ -518,32 +777,57 @@ void* VulkanRenderer::get_native_handle(ERendererNativeHandle handle_type) const
     case ERendererNativeHandle::ImmediateContext:
       return nullptr;
     case ERendererNativeHandle::GraphicsQueue:
-      return to_native_handle_ptr(static_cast<VkQueue>(*vk_context->get_graphics_queue()));
     case ERendererNativeHandle::ComputeQueue:
-      return to_native_handle_ptr(static_cast<VkQueue>(*vk_context->get_graphics_queue()));
     case ERendererNativeHandle::TransferQueue:
       return to_native_handle_ptr(static_cast<VkQueue>(*vk_context->get_graphics_queue()));
-    case ERendererNativeHandle::Swapchain:
-      return to_native_handle_ptr(static_cast<VkSwapchainKHR>(*swapchain->get_swapchain()));
     case ERendererNativeHandle::ActiveCommandBuffer:
-      assert(current_frame_ < frames.size());
-      return to_native_handle_ptr(static_cast<VkCommandBuffer>(*frames[current_frame_].command_buffer));
-    case ERendererNativeHandle::ActiveRenderTargetView:
-      assert(swapchain && current_image_index_ < swapchain->get_image_views().size());
-      return to_native_handle_ptr(static_cast<VkImageView>(*swapchain->get_image_views()[current_image_index_]));
+      return to_native_handle_ptr(static_cast<VkCommandBuffer>(*frames[current_frame].command_buffer));
     default:
       return nullptr;
   }
 }
 
+void* VulkanRenderer::get_native_handle(RenderTargetID target, ERenderTargetNativeHandle type) const {
+  const RenderTargetEntry* entry = render_targets.get(target);
+  if (!entry) return nullptr;
+
+  vk::Image image;
+  vk::ImageView image_view;
+  if (const auto* offscreen = std::get_if<std::unique_ptr<VulkanRenderTarget>>(entry)) {
+    image = (*offscreen)->get_image();
+    image_view = (*offscreen)->get_image_view();
+  } else {
+    // Null unless the backbuffer was acquired this frame
+    const VulkanPresenter& presenter = *presenters.get(std::get<PresenterID>(*entry))->presenter;
+    image = presenter.get_acquired_image();
+    image_view = presenter.get_acquired_image_view();
+  }
+
+  switch (type) {
+    case ERenderTargetNativeHandle::Image:
+      return to_native_handle_ptr(static_cast<VkImage>(image));
+    case ERenderTargetNativeHandle::ImageView:
+      return to_native_handle_ptr(static_cast<VkImageView>(image_view));
+    default:
+      return nullptr;
+  }
+}
+
+void* VulkanRenderer::get_native_handle(PresenterID presenter) const {
+  const PresenterEntry* entry = presenters.get(presenter);
+  if (!entry) return nullptr;
+  return to_native_handle_ptr(static_cast<VkSwapchainKHR>(entry->presenter->get_swapchain()));
+}
+
 RendererBackendInfo VulkanRenderer::get_backend_info() const {
   const uint32_t queue_family = vk_context->get_graphics_queue_index();
 
-  RendererBackendInfo info{.graphics_queue_family = queue_family,
-                           .compute_queue_family = queue_family,
-                           .transfer_queue_family = queue_family,
-                           .swapchain_image_count = static_cast<uint32_t>(swapchain->get_image_count()),
-                           .native_swapchain_format = static_cast<uint32_t>(swapchain->get_surface_format().format)};
+  RendererBackendInfo info{
+    .graphics_queue_family = queue_family,
+    .compute_queue_family = queue_family,
+    .transfer_queue_family = queue_family,
+    .frames_in_flight = MAX_FRAMES_IN_FLIGHT
+  };
 
   return info;
 }
@@ -650,4 +934,4 @@ void VulkanRenderer::build_batches() {
   pending_commands.clear();
 }
 
-} // namespace mole
+} // mole

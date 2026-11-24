@@ -13,6 +13,7 @@ class VulkanContext {
  public:
   static constexpr uint32_t PREFERRED_MAX_TEXTURES = 65536;
   static constexpr uint32_t MIN_REQUIRED_TEXTURES  = 1024;
+  static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
   ~VulkanContext() = default;
 
@@ -21,24 +22,22 @@ class VulkanContext {
   const inline vk::raii::Device& get_logical_device() const { return logical_device; }
   const inline vk::raii::Queue& get_graphics_queue() const { return graphics_queue; }
   const inline uint32_t get_graphics_queue_index() const { return queue_index; }
-  const inline vk::raii::SurfaceKHR& get_surface() const { return surface; }
   const inline uint32_t get_texture_capacity() const { return texture_capacity; }
 
-  static Result<std::unique_ptr<VulkanContext>> create(void* native_window_handle);
+  static Result<std::unique_ptr<VulkanContext>> create();
  private:
   explicit VulkanContext() = default;
 
   Result<void> create_instance();
-  Result<void> create_surface(void* native_window_handle);
   Result<void> pick_physical_device();
   Result<void> create_logical_device();
 
   [[nodiscard]] bool is_physical_device_suitable(const vk::PhysicalDevice& physical_device) const;
+  [[nodiscard]] static bool supports_presentation(const vk::PhysicalDevice& physical_device, uint32_t queue_family);
 
   vk::raii::Context context;
 
   vk::raii::Instance vk_instance = nullptr;
-  vk::raii::SurfaceKHR surface = nullptr;
   vk::raii::PhysicalDevice physical_device = nullptr;
   vk::raii::Device logical_device = nullptr;
   uint32_t queue_index = ~0;
