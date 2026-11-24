@@ -119,17 +119,20 @@ Result<void> VulkanRenderer::create_command_pool() {
 }
 
 Result<void> VulkanRenderer::create_descriptor_set_layout() {
-  vk::DescriptorSetLayoutBinding ubo_binding{.binding = 0,
-                                             .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                             .descriptorCount = 1,
-                                             .stageFlags = vk::ShaderStageFlagBits::eVertex,
-                                             .pImmutableSamplers = nullptr};
+  vk::DescriptorSetLayoutBinding ubo_binding{
+    .binding = 0,
+    .descriptorType = vk::DescriptorType::eUniformBuffer,
+    .descriptorCount = 1,
+    .stageFlags = vk::ShaderStageFlagBits::eVertex,
+    .pImmutableSamplers = nullptr
+  };
 
   vk::DescriptorSetLayoutBinding ssbo_binding = {
-      .binding = 1,
-      .descriptorType = vk::DescriptorType::eStorageBuffer, // <--- Storage Buffer!
-      .descriptorCount = 1,
-      .stageFlags = vk::ShaderStageFlagBits::eVertex};
+    .binding = 1,
+    .descriptorType = vk::DescriptorType::eStorageBuffer, // <--- Storage Buffer!
+    .descriptorCount = 1,
+    .stageFlags = vk::ShaderStageFlagBits::eVertex
+  };
 
   std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {ubo_binding, ssbo_binding};
 
@@ -137,7 +140,7 @@ Result<void> VulkanRenderer::create_descriptor_set_layout() {
       .bindingCount = static_cast<uint32_t>(bindings.size()), .pBindings = bindings.data()};
 
   auto vkr_create_desc_set_layout =
-      vk_context->get_logical_device().createDescriptorSetLayout(descriptor_set_layout_info);
+    vk_context->get_logical_device().createDescriptorSetLayout(descriptor_set_layout_info);
   if (vkr_create_desc_set_layout.result != vk::Result::eSuccess) {
     return mole::fail("Failed to create descriptor set layout");
   }
@@ -151,14 +154,22 @@ Result<void> VulkanRenderer::create_frame_data() {
 
   // 1. Create Descriptor Pool for UBOs (Set 0)
   std::array<vk::DescriptorPoolSize, 2> pool_sizes = {
-      vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBuffer, .descriptorCount = MAX_FRAMES_IN_FLIGHT},
-      vk::DescriptorPoolSize{.type = vk::DescriptorType::eStorageBuffer, // <--- Add this!
-                             .descriptorCount = MAX_FRAMES_IN_FLIGHT}};
+    vk::DescriptorPoolSize{
+      .type = vk::DescriptorType::eUniformBuffer, 
+      .descriptorCount = MAX_FRAMES_IN_FLIGHT
+    },
+    vk::DescriptorPoolSize{
+      .type = vk::DescriptorType::eStorageBuffer, // <--- Add this!
+      .descriptorCount = MAX_FRAMES_IN_FLIGHT
+    }
+  };
 
-  vk::DescriptorPoolCreateInfo pool_info{.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-                                         .maxSets = MAX_FRAMES_IN_FLIGHT,
-                                         .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
-                                         .pPoolSizes = pool_sizes.data()};
+  vk::DescriptorPoolCreateInfo pool_info{
+    .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+    .maxSets = MAX_FRAMES_IN_FLIGHT,
+    .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
+    .pPoolSizes = pool_sizes.data()
+  };
 
   auto vkr_ubo_pool = vk_context->get_logical_device().createDescriptorPool(pool_info);
   if (vkr_ubo_pool.result != vk::Result::eSuccess) {
@@ -167,9 +178,11 @@ Result<void> VulkanRenderer::create_frame_data() {
   ubo_descriptor_pool = std::move(vkr_ubo_pool.value);
 
   // 2. Allocate Command Buffers
-  vk::CommandBufferAllocateInfo alloc_info{.commandPool = *command_pool,
-                                           .level = vk::CommandBufferLevel::ePrimary,
-                                           .commandBufferCount = MAX_FRAMES_IN_FLIGHT};
+  vk::CommandBufferAllocateInfo alloc_info{
+    .commandPool = *command_pool,
+    .level = vk::CommandBufferLevel::ePrimary,
+    .commandBufferCount = MAX_FRAMES_IN_FLIGHT
+  };
 
   auto vkr_cmd_buffers = vk_context->get_logical_device().allocateCommandBuffers(alloc_info);
   if (vkr_cmd_buffers.result != vk::Result::eSuccess) {
@@ -222,18 +235,23 @@ Result<void> VulkanRenderer::create_frame_data() {
     vk::DescriptorBufferInfo ssbo_info{.buffer = *frame.quad_buffer, .offset = 0, .range = sizeof(Quad) * MAX_QUADS};
 
     std::array<vk::WriteDescriptorSet, 2> descriptor_writes = {
-        vk::WriteDescriptorSet{.dstSet = *frame.descriptor_set,
-                               .dstBinding = 0,
-                               .dstArrayElement = 0,
-                               .descriptorCount = 1,
-                               .descriptorType = vk::DescriptorType::eUniformBuffer,
-                               .pBufferInfo = &ubo_info},
-        vk::WriteDescriptorSet{.dstSet = *frame.descriptor_set,
-                               .dstBinding = 1,
-                               .dstArrayElement = 0,
-                               .descriptorCount = 1,
-                               .descriptorType = vk::DescriptorType::eStorageBuffer,
-                               .pBufferInfo = &ssbo_info}};
+      vk::WriteDescriptorSet{
+        .dstSet = *frame.descriptor_set,
+        .dstBinding = 0,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = vk::DescriptorType::eUniformBuffer,
+        .pBufferInfo = &ubo_info
+      },
+      vk::WriteDescriptorSet{
+        .dstSet = *frame.descriptor_set,
+        .dstBinding = 1,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = vk::DescriptorType::eStorageBuffer,
+        .pBufferInfo = &ssbo_info
+      }
+    };
 
     vk_context->get_logical_device().updateDescriptorSets(descriptor_writes, nullptr);
   }
@@ -328,10 +346,15 @@ void VulkanRenderer::end_pass() {
       .storeOp = vk::AttachmentStoreOp::eStore,
       .clearValue = clearColor};
 
-  vk::RenderingInfo renderingInfo = {.renderArea = {.offset = {0, 0}, .extent = swapchain->get_extent()},
-                                     .layerCount = 1,
-                                     .colorAttachmentCount = 1,
-                                     .pColorAttachments = &attachmentInfo};
+  vk::RenderingInfo renderingInfo = {
+    .renderArea = {
+      .offset = {0, 0}, 
+      .extent = swapchain->get_extent()
+    },
+    .layerCount = 1,
+    .colorAttachmentCount = 1,
+    .pColorAttachments = &attachmentInfo
+  };
 
   frame.command_buffer.beginRendering(renderingInfo);
 
@@ -395,9 +418,10 @@ void VulkanRenderer::end_frame() {
 
   // 1. Transition image to presentation layout
   transition_image_layout(
-      frame.command_buffer, swapchain->get_images()[current_image_index_], vk::ImageLayout::eColorAttachmentOptimal,
-      vk::ImageLayout::ePresentSrcKHR, vk::AccessFlagBits2::eColorAttachmentWrite, {},
-      vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe);
+    frame.command_buffer, swapchain->get_images()[current_image_index_], vk::ImageLayout::eColorAttachmentOptimal,
+    vk::ImageLayout::ePresentSrcKHR, vk::AccessFlagBits2::eColorAttachmentWrite, {},
+    vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eBottomOfPipe
+  );
 
   // 2. End the command buffer
   if (frame.command_buffer.end() != vk::Result::eSuccess) {
@@ -407,19 +431,20 @@ void VulkanRenderer::end_frame() {
 
   // 3. Submit the frame to the GPU queue
   vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-  const vk::SubmitInfo submitInfo{.waitSemaphoreCount = 1,
-                                  .pWaitSemaphores = &*frame.image_available_semaphore,
-                                  .pWaitDstStageMask = &waitDestinationStageMask,
-                                  .commandBufferCount = 1,
-                                  .pCommandBuffers = &*frame.command_buffer,
-                                  .signalSemaphoreCount = 1,
-                                  .pSignalSemaphores = &*render_finished_semaphores[current_image_index_]};
+  const vk::SubmitInfo submitInfo{
+    .waitSemaphoreCount = 1,
+    .pWaitSemaphores = &*frame.image_available_semaphore,
+    .pWaitDstStageMask = &waitDestinationStageMask,
+    .commandBufferCount = 1,
+    .pCommandBuffers = &*frame.command_buffer,
+    .signalSemaphoreCount = 1,
+    .pSignalSemaphores = &*render_finished_semaphores[current_image_index_]
+  };
 
   vk_context->get_graphics_queue().submit(submitInfo, *frame.in_flight_fence);
 
   // 4. Present it to the screen
-  auto r_present = swapchain->present(vk_context->get_graphics_queue(),
-                                      render_finished_semaphores[current_image_index_], current_image_index_);
+  auto r_present = swapchain->present(vk_context->get_graphics_queue(), render_finished_semaphores[current_image_index_], current_image_index_);
   if (!r_present) {
     needs_framebuffer_resize_ = true;
   }
@@ -478,16 +503,21 @@ void VulkanRenderer::transition_image_layout(vk::raii::CommandBuffer& cmd_buffer
                                              vk::PipelineStageFlags2 src_stage_mask,
                                              vk::PipelineStageFlags2 dst_stage_mask) {
   vk::ImageMemoryBarrier2 barrier = {
-      .srcStageMask = src_stage_mask,
-      .srcAccessMask = src_access_mask,
-      .dstStageMask = dst_stage_mask,
-      .dstAccessMask = dst_access_mask,
-      .oldLayout = old_layout,
-      .newLayout = new_layout,
-      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .image = image,
-      .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = 1}};
+    .srcStageMask = src_stage_mask,
+    .srcAccessMask = src_access_mask,
+    .dstStageMask = dst_stage_mask,
+    .dstAccessMask = dst_access_mask,
+    .oldLayout = old_layout,
+    .newLayout = new_layout,
+    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .image = image,
+    .subresourceRange = {
+      .aspectMask = vk::ImageAspectFlagBits::eColor, 
+      .levelCount = 1, 
+      .layerCount = 1
+    }
+  };
 
   vk::DependencyInfo dependency_info = {.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier};
 
@@ -539,11 +569,13 @@ void* VulkanRenderer::get_native_handle(ERendererNativeHandle handle_type) const
 RendererBackendInfo VulkanRenderer::get_backend_info() const {
   const uint32_t queue_family = vk_context->get_graphics_queue_index();
 
-  RendererBackendInfo info{.graphics_queue_family = queue_family,
-                           .compute_queue_family = queue_family,
-                           .transfer_queue_family = queue_family,
-                           .swapchain_image_count = static_cast<uint32_t>(swapchain->get_image_count()),
-                           .native_swapchain_format = static_cast<uint32_t>(swapchain->get_surface_format().format)};
+  RendererBackendInfo info{
+    .graphics_queue_family = queue_family,
+    .compute_queue_family = queue_family,
+    .transfer_queue_family = queue_family,
+    .swapchain_image_count = static_cast<uint32_t>(swapchain->get_image_count()),
+    .native_swapchain_format = static_cast<uint32_t>(swapchain->get_surface_format().format)
+  };
 
   return info;
 }
@@ -650,4 +682,4 @@ void VulkanRenderer::build_batches() {
   pending_commands.clear();
 }
 
-} // namespace mole
+} // mole
