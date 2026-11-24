@@ -12,7 +12,7 @@ Result<std::unique_ptr<IImGuiBridge>> IImGuiBridge::create(const ImGuiBridgeOpti
   switch (options.renderer_type) {
     case ERendererType::Vulkan: {
 #if defined(MOLE_PLATFORM_WINDOWS)
-      auto r_bridge = Win32VulkanImGuiBridge::create(context, options.native_window_handle);
+      auto r_bridge = Win32VulkanImGuiBridge::create(context, options.native_window_handle, options.presenter);
       if (!r_bridge) return mole::fail(r_bridge.error());
       return std::unique_ptr<IImGuiBridge>(std::move(r_bridge).value());
 #else

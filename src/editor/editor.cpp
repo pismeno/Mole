@@ -132,15 +132,10 @@ Result<void> Editor::init_rendering_context() {
   packed_material_cache = std::make_unique<PackedMaterialCache>(rendering_context);
   rendering_context.packed_material_cache = packed_material_cache.get();
 
-  RendererOptions renderer_options{
-    .type = ERendererType::Vulkan,
-    .native_window_handle = window->get_native_handle(),
-    .window_width = window->get_framebuffer_width(),
-    .window_height = window->get_framebuffer_height()
-  };
-
-  MOLE_TRY_ASSIGN(renderer, IRenderer::create(renderer_options, rendering_context));
+  MOLE_TRY_ASSIGN(renderer, IRenderer::create(ERendererType::Vulkan, rendering_context));
   rendering_context.renderer = renderer.get();
+
+  MOLE_TRY_ASSIGN(main_presenter, renderer->create_presenter(window.get()));
 
   return mole::ok();
 }
@@ -163,7 +158,8 @@ Result<void> Editor::init_editor_context() {
 Result<void> Editor::init_imgui() {
   ImGuiBridgeOptions bridge_options{
     .renderer_type = ERendererType::Vulkan,
-    .native_window_handle = window->get_native_handle()
+    .native_window_handle = window->get_native_handle(),
+    .presenter = main_presenter
   };
 
   MOLE_TRY_ASSIGN(im_gui_bridge, IImGuiBridge::create(bridge_options, context));
@@ -198,10 +194,6 @@ Result<void> Editor::run() {
       continue;
     }
 
-    if (renderer->needs_framebuffer_resize()) {
-      MOLE_TRY(renderer->resize_framebuffer(window->get_framebuffer_width(), window->get_framebuffer_height()));
-    }
-
     MaterialID test_mat_id2 = MaterialID::from(1, 0);
 
     if (inputs.is_key_pressed(EKeyCode::M)) {
@@ -214,29 +206,16 @@ Result<void> Editor::run() {
 
     state->update();
 
-    renderer->begin_frame();
+    MOLE_TRY(renderer->begin_frame());
     im_gui_bridge->begin_frame();
 
-    state->render(renderer.get());
+    MOLE_TRY(state->render());
 
-    im_gui_bridge->end_frame();
-    renderer->end_frame();
+    MOLE_TRY(im_gui_bridge->end_frame());
+    MOLE_TRY(renderer->end_frame());
 
     state->end_frame();
     inputs.end_frame();
-
-    if (renderer->needs_framebuffer_resize()) {
-      auto r_resize_framebuffer =
-          renderer->resize_framebuffer(window->get_framebuffer_width(), window->get_framebuffer_height());
-
-      if (!r_resize_framebuffer) {
-        return mole::fail(r_resize_framebuffer.error());
-      }
-    }
-
-    if (renderer->is_context_lost()) {
-      return mole::fail("Renderer context lost");
-    }
   }
 
   return mole::ok();

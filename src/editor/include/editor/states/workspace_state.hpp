@@ -5,6 +5,7 @@
 #include <memory>
 #include <string_view>
 
+#include "rendering/renderer_types.hpp"
 #include "resources/view_data.hpp"
 #include "utils/result.hpp"
 
@@ -18,6 +19,7 @@ class Scene;
 class AssetManager;
 class SceneFactory;
 class RenderGatherer;
+class IImGuiBridge;
 class IRenderer;
 
 class WorkspaceState : public IEditorState {
@@ -27,7 +29,7 @@ public:
   static constexpr float PPU = 32.0f; // TODO move into some sort of settings
 
   void update() override;
-  void render(IRenderer* renderer) override;
+  Result<void> render() override;
   void end_frame() override;
 
   const Project& get_project() const;
@@ -39,7 +41,7 @@ private:
   explicit WorkspaceState(const EditorContext& context);
 
   Result<void> load_scene(std::string_view path);
-  ViewData calculate_view_data(IRenderer* renderer);
+  Result<void> render_game_viewport();
   ViewData calculate_view_data(float width, float height);
 
   std::unique_ptr<Project> project;
@@ -51,6 +53,11 @@ private:
   AssetManager* asset_manager;
   SceneFactory* scene_factory;
   RenderGatherer* render_gatherer;
+  IRenderer* renderer;
+  IImGuiBridge* im_gui_bridge;
+
+  RenderTargetID viewport_target = RenderTargetID::INVALID;
+  bool viewport_rendered = false;
 };
 
-} // namespace mole
+} // mole

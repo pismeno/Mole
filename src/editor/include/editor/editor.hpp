@@ -8,6 +8,7 @@
 #include "node_system/node_system_context.hpp"
 #include "node_system/node_types.hpp"
 #include "osal/os_context.hpp"
+#include "rendering/renderer_types.hpp"
 #include "rendering/rendering_context.hpp"
 #include "resources/resources_context.hpp"
 #include "utils/result.hpp"
@@ -70,15 +71,17 @@ private:
   std::unique_ptr<MaterialShaderLayoutRegistry> material_shader_layout_registry;
   std::unique_ptr<MaterialPacker> material_packer;
   std::unique_ptr<PackedMaterialCache> packed_material_cache;
+  std::unique_ptr<IWindow> window;
   std::unique_ptr<IRenderer> renderer;
   std::unique_ptr<SceneFactory> scene_factory;
   std::unique_ptr<RenderGatherer> render_gatherer;
   std::unique_ptr<ProcessOrchestrator> process_orchestrator;
   std::unique_ptr<ManagerReflectorBinderFactory<EngineManagers>> manager_reflector_binder_factory;
-
-  std::unique_ptr<IWindow> window;
-  std::unique_ptr<IEditorState> state;
   std::unique_ptr<IImGuiBridge> im_gui_bridge;
+  
+  std::unique_ptr<IEditorState> state;
+
+  PresenterID main_presenter = PresenterID::INVALID; // plain handle, owned by the renderer
 };
 
 } // mole

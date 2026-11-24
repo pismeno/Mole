@@ -10,7 +10,9 @@
 
 #include <algorithm>
 #include <utility>
+#include <vector>
 
+#include <glm/glm.hpp>
 #include <imgui.h>
 #include <imgui_impl_vulkan.h>
 #include <imgui_impl_win32.h>
@@ -20,6 +22,9 @@
 #include "rendering/renderer_types.hpp"
 #include "rendering/rendering_context.hpp"
 #include "utils/result.hpp"
+
+static_assert(sizeof(ImTextureID) == sizeof(uint64_t));
+static_assert(sizeof(ImGuiID) == sizeof(uint32_t));
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -48,9 +53,11 @@ int create_vk_surface(ImGuiViewport* viewport, ImU64 vk_instance, const void* vk
 
 namespace mole {
 
-Win32VulkanImGuiBridge::Win32VulkanImGuiBridge(const EditorContext& context, void* window_handle) : 
-  renderer(context.rendering_context->renderer), 
-  window_handle(window_handle) {}
+Win32VulkanImGuiBridge::Win32VulkanImGuiBridge(const EditorContext& context, void* window_handle, PresenterID presenter) : 
+  renderer(context.rendering_context->renderer),
+  window_handle(window_handle),
+  presenter(presenter),
+  frames_in_flight(context.rendering_context->renderer->get_backend_info().frames_in_flight) {}
 
 Win32VulkanImGuiBridge::~Win32VulkanImGuiBridge() {
   if (g_original_wndproc && window_handle) {
@@ -66,8 +73,8 @@ Win32VulkanImGuiBridge::~Win32VulkanImGuiBridge() {
   ImGui::DestroyContext();
 }
 
-Result<std::unique_ptr<Win32VulkanImGuiBridge>> Win32VulkanImGuiBridge::create(const EditorContext& context, void* window_handle) {
-  auto bridge = std::unique_ptr<Win32VulkanImGuiBridge>(new Win32VulkanImGuiBridge(context, window_handle));
+Result<std::unique_ptr<Win32VulkanImGuiBridge>> Win32VulkanImGuiBridge::create(const EditorContext& context, void* window_handle, PresenterID presenter) {
+  auto bridge = std::unique_ptr<Win32VulkanImGuiBridge>(new Win32VulkanImGuiBridge(context, window_handle, presenter));
   MOLE_TRY(bridge->init());
   return bridge;
 }
@@ -86,15 +93,15 @@ Result<void> Win32VulkanImGuiBridge::init() {
     return mole::fail("Failed to initialize ImGui Win32 backend");
   }
 
-  this->window_handle = window_handle;
   g_original_wndproc =
       reinterpret_cast<WNDPROC>(SetWindowLongPtr((HWND)window_handle, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(imgui_wndproc_hook)));
 
   ImGui::GetPlatformIO().Platform_CreateVkSurface = create_vk_surface;
 
   const RendererBackendInfo backend_info = renderer->get_backend_info();
+  MOLE_TRY_ASSIGN(const PresenterInfo presenter_info, renderer->get_info(presenter));
 
-  VkFormat color_format = static_cast<VkFormat>(backend_info.native_swapchain_format);
+  VkFormat color_format = static_cast<VkFormat>(presenter_info.native_format);
 
   VkPipelineRenderingCreateInfoKHR pipeline_rendering_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
@@ -106,18 +113,20 @@ Result<void> Win32VulkanImGuiBridge::init() {
       .stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
   };
 
-  ImGui_ImplVulkan_InitInfo init_info{};
-  init_info.ApiVersion = VK_API_VERSION_1_3;
-  init_info.Instance = renderer->get_native_handle<VkInstance>(ERendererNativeHandle::Instance);
-  init_info.PhysicalDevice = renderer->get_native_handle<VkPhysicalDevice>(ERendererNativeHandle::PhysicalAdapter);
-  init_info.Device = renderer->get_native_handle<VkDevice>(ERendererNativeHandle::Device);
-  init_info.QueueFamily = backend_info.graphics_queue_family;
-  init_info.Queue = renderer->get_native_handle<VkQueue>(ERendererNativeHandle::GraphicsQueue);
-  init_info.DescriptorPoolSize = 64;
-  init_info.MinImageCount = 2;
-  init_info.ImageCount = (std::max)(2u, backend_info.swapchain_image_count);
-  init_info.UseDynamicRendering = true;
+  ImGui_ImplVulkan_InitInfo init_info{
+    .ApiVersion = VK_API_VERSION_1_3,
+    .Instance = renderer->get_native_handle<VkInstance>(ERendererNativeHandle::Instance),
+    .PhysicalDevice = renderer->get_native_handle<VkPhysicalDevice>(ERendererNativeHandle::PhysicalAdapter),
+    .Device = renderer->get_native_handle<VkDevice>(ERendererNativeHandle::Device),
+    .QueueFamily = backend_info.graphics_queue_family,
+    .Queue = renderer->get_native_handle<VkQueue>(ERendererNativeHandle::GraphicsQueue),
+    .DescriptorPoolSize = 64,
+    .MinImageCount = 2,
+    .ImageCount = (std::max)(2u, presenter_info.image_count),
+    .UseDynamicRendering = true,
+  };
   init_info.PipelineInfoMain.PipelineRenderingCreateInfo = pipeline_rendering_create_info;
+  
 
   if (!ImGui_ImplVulkan_Init(&init_info)) {
     ImGui_ImplWin32_Shutdown();
@@ -129,49 +138,66 @@ Result<void> Win32VulkanImGuiBridge::init() {
 }
 
 void Win32VulkanImGuiBridge::begin_frame() {
+  ++frame_count;
+  free_retired_textures();
+
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplWin32_NewFrame();
   ImGui::NewFrame();
 }
 
-void Win32VulkanImGuiBridge::end_frame() {
+Result<uint64_t> Win32VulkanImGuiBridge::get_texture_id(RenderTargetID target) {
+  auto image_view = renderer->get_native_handle<VkImageView>(target, ERenderTargetNativeHandle::ImageView);
+  if (image_view == VK_NULL_HANDLE) return mole::fail("Render target has no image view (stale or presenter-owned)");
+
+  auto it = textures.find(target);
+  if (it != textures.end()) {
+    if (it->second.image_view == image_view) return reinterpret_cast<uint64_t>(it->second.descriptor_set);
+    retired_textures.push_back({
+      .retire_after_frame = frame_count + frames_in_flight,
+      .descriptor_set = it->second.descriptor_set
+    });
+    textures.erase(it);
+  }
+
+  VkDescriptorSet descriptor_set = ImGui_ImplVulkan_AddTexture(image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  if (descriptor_set == VK_NULL_HANDLE) return mole::fail("Failed to allocate ImGui texture descriptor set");
+
+  textures.emplace(target, Texture{
+    .image_view = image_view,
+    .descriptor_set = descriptor_set
+  });
+  return reinterpret_cast<uint64_t>(descriptor_set);
+}
+
+void Win32VulkanImGuiBridge::release_texture(RenderTargetID target) {
+  auto it = textures.find(target);
+  if (it == textures.end()) return;
+  retired_textures.push_back({
+    .retire_after_frame = frame_count + frames_in_flight,
+    .descriptor_set = it->second.descriptor_set
+  });
+  textures.erase(it);
+}
+
+void Win32VulkanImGuiBridge::free_retired_textures() {
+  std::erase_if(retired_textures, [this](const RetiredTexture& retired) {
+    if (retired.retire_after_frame > frame_count) return false;
+    ImGui_ImplVulkan_RemoveTexture(retired.descriptor_set);
+    return true;
+  });
+}
+
+Result<void> Win32VulkanImGuiBridge::end_frame() {
   ImGui::Render();
 
   ImDrawData* draw_data = ImGui::GetDrawData();
   if (draw_data) {
-    auto command_buffer = renderer->get_native_handle<VkCommandBuffer>(ERendererNativeHandle::ActiveCommandBuffer);
-    auto image_view = renderer->get_native_handle<VkImageView>(ERendererNativeHandle::ActiveRenderTargetView);
-
-    if (command_buffer != VK_NULL_HANDLE && image_view != VK_NULL_HANDLE) {
-      VkRenderingAttachmentInfo attachment_info{
-          .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-          .pNext = nullptr,
-          .imageView = image_view,
-          .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-          .resolveMode = VK_RESOLVE_MODE_NONE,
-          .resolveImageView = VK_NULL_HANDLE,
-          .resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-          .loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
-          .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-          .clearValue = {},
-      };
-
-      VkRenderingInfo rendering_info{
-          .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-          .pNext = nullptr,
-          .flags = 0,
-          .renderArea = {{0, 0}, {renderer->get_framebuffer_width(), renderer->get_framebuffer_height()}},
-          .layerCount = 1,
-          .viewMask = 0,
-          .colorAttachmentCount = 1,
-          .pColorAttachments = &attachment_info,
-          .pDepthAttachment = nullptr,
-          .pStencilAttachment = nullptr,
-      };
-
-      vkCmdBeginRendering(command_buffer, &rendering_info);
+    MOLE_TRY_ASSIGN(bool pass_open, renderer->begin_pass(renderer->get_render_target(presenter), PassOptions{.clear_color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)}));
+    if (pass_open) {
+      auto command_buffer = renderer->get_native_handle<VkCommandBuffer>(ERendererNativeHandle::ActiveCommandBuffer);
       ImGui_ImplVulkan_RenderDrawData(draw_data, command_buffer);
-      vkCmdEndRendering(command_buffer);
+      MOLE_TRY(renderer->end_pass());
     }
   }
 
@@ -180,6 +206,8 @@ void Win32VulkanImGuiBridge::end_frame() {
     ImGui::UpdatePlatformWindows();
     ImGui::RenderPlatformWindowsDefault();
   }
+
+  return mole::ok();
 }
 
-} // namespace mole
+} // mole
