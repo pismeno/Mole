@@ -6,7 +6,6 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
-#include <vector>
 
 #include "resources/asset_handle.hpp"
 #include "resources/asset_manager.hpp"
@@ -15,6 +14,7 @@
 #include "resources/material_types.hpp"
 #include "utils/creflector.hpp"
 #include "utils/result.hpp"
+#include "utils/slot_map.hpp"
 #include "utils/uuid.hpp"
 
 namespace mole {
@@ -28,10 +28,11 @@ public:
 
   template <std::invocable<const Material&> TFunction>
   Result<void> with_material(MaterialID material_id, TFunction&& fn) const {
-    if (!is_valid(material_id)) {
+    const MaterialEntry* entry = entries.get(material_id);
+    if (!entry) {
       return mole::fail("MaterialID is invalid");
     }
-    std::forward<TFunction>(fn)(entries[material_id.index()].material);
+    std::forward<TFunction>(fn)(entry->material);
     return mole::ok();
   }
 
@@ -227,7 +228,7 @@ public:
 
     MaterialID id = add(std::move(mat));
     if (!material_uuid.is_nil()) {
-      entries[id.index()].uuid = material_uuid;
+      entries.get(id)->uuid = material_uuid;
       uuid_to_id[material_uuid] = id;
     }
     return id;
@@ -236,19 +237,14 @@ public:
 private:
   struct MaterialEntry {
     Material material{};
-    uint32_t generation{0};
     uint32_t version{0};
     UUID uuid{};
     AssetHandle<MaterialAsset> source_asset{};
     uint32_t synced_asset_version{0};
-    bool alive{false};
   };
 
   std::unordered_map<UUID, MaterialID> uuid_to_id;
-  std::vector<MaterialEntry> entries;
-
-  uint32_t next_unused_index{0};
-  std::vector<uint32_t> recycled_indices;
+  SlotMap<MaterialID, MaterialEntry> entries;
 
   AssetManager* asset_manager;
 };

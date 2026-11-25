@@ -70,12 +70,7 @@ public:
 
     // Gather active nodes
     std::vector<NodeID> active_nodes;
-    for (uint32_t i = 0; i < scene.get_highest_allocated_node_index(); ++i) {
-      NodeID id = NodeID::from(i, scene.generations[i]);
-      if (scene.is_node_valid(id)) {
-        active_nodes.push_back(id);
-      }
-    }
+    scene.nodes.for_each([&](NodeID id, const Scene::NodeRecord&) { active_nodes.push_back(id); });
 
     uint32_t node_count = static_cast<uint32_t>(active_nodes.size());
     re.begin_array("nodes", node_count);
@@ -91,7 +86,7 @@ public:
         saved_parent_uuid = scene.get_uuid(parent).value_or(UUID{});
       }
 
-      std::string node_type_str = scene.node_types[current.index()];
+      std::string node_type_str = scene.nodes.get(current)->type;
 
       serialize(re, "id", saved_uuid);
       serialize(re, "parent_id", saved_parent_uuid);

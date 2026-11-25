@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -19,6 +18,7 @@
 #include "resources/asset_handle.hpp"
 #include "resources/asset_types.hpp"
 #include "utils/result.hpp"
+#include "utils/slot_map.hpp"
 #include "utils/string_hash.hpp"
 #include "utils/uuid.hpp"
 
@@ -50,7 +50,7 @@ public:
   /**
    * @return The highest index part of NodeID of a node that exists.
    */
-  [[nodiscard]] inline uint32_t get_highest_allocated_node_index() const noexcept { return next_unused_id.load(); }
+  [[nodiscard]] inline uint32_t get_highest_allocated_node_index() const noexcept { return nodes.slot_count(); }
 
   void update();
   void end_frame();
@@ -73,15 +73,13 @@ public:
 private:
   std::string scene_type_name;
 
-  [[nodiscard]] NodeID generate_id();
+  struct NodeRecord {
+    Node node;
+    std::string type;
+    UUID uuid;
+  };
 
-  std::atomic<uint32_t> next_unused_id{0};
-  std::vector<uint32_t> recycled_ids;
-  std::vector<uint32_t> generations; // Index = the raw array slot, Value = the current active generation
-  std::vector<Node> nodes;
-  std::vector<std::string> node_types;
-
-  std::vector<UUID> node_uuids;
+  SlotMap<NodeID, NodeRecord> nodes{MAX_ACTIVE_NODES};
   std::unordered_map<UUID, NodeID> uuid_to_node_id;
 
   std::unordered_map<std::string, std::unique_ptr<INodeManager>, StringHash, std::equal_to<>> managers_map;

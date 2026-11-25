@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -15,12 +16,8 @@
 
 namespace mole {
 
-Scene::Scene(std::string scene_type_name) : scene_type_name(std::move(scene_type_name)) {
-  nodes.resize(MAX_ACTIVE_NODES);
-  generations.resize(MAX_ACTIVE_NODES);
-  node_types.resize(MAX_ACTIVE_NODES);
-  node_uuids.resize(MAX_ACTIVE_NODES);
-}
+Scene::Scene(std::string scene_type_name) :
+  scene_type_name(std::move(scene_type_name)) {}
 
 Scene::~Scene() = default;
 
@@ -32,50 +29,26 @@ INodeManager* Scene::get_manager_by_name(std::string_view type_id) const {
   return nullptr;
 }
 
-[[nodiscard]] NodeID Scene::generate_id() {
-  if (!recycled_ids.empty()) {
-    uint32_t recycled = recycled_ids.back();
-    recycled_ids.pop_back();
-    uint32_t current_gen = generations[recycled];
-
-    return NodeID::from(recycled, current_gen);
-  }
-
-  if (next_unused_id >= MAX_ACTIVE_NODES) {
-    return NodeID::INVALID;
-  }
-
-  uint32_t new_id = next_unused_id++;
-  generations[new_id] = 0;
-
-  return NodeID::from(new_id, 0);
-}
-
 [[nodiscard]] bool Scene::is_node_valid(NodeID node_id) const noexcept {
-  if (node_id == NodeID::INVALID || node_id.index() >= MAX_ACTIVE_NODES) {
-    return false;
-  }
-  return generations[node_id.index()] == node_id.generation();
+  return nodes.contains(node_id);
 }
 
 [[nodiscard]] const NodeID Scene::get_nodes_parent(NodeID node_id) const noexcept {
-  if (!is_node_valid(node_id)) return NodeID::INVALID;
-
-  return nodes[node_id.index()].parent_id;
+  const NodeRecord* record = nodes.get(node_id);
+  return record ? record->node.parent_id : NodeID::INVALID;
 }
 
 [[nodiscard]] std::vector<NodeID> Scene::get_nodes_children(NodeID node_id) const noexcept {
-  if (!is_node_valid(node_id)) return {};
-
-  return nodes[node_id.index()].children_ids;
+  const NodeRecord* record = nodes.get(node_id);
+  return record ? record->node.children_ids : std::vector<NodeID>{};
 }
 
 Result<UUID> Scene::get_uuid(NodeID node_id) const {
-  if (!is_node_valid(node_id)) {
+  const NodeRecord* record = nodes.get(node_id);
+  if (!record) {
     return mole::fail("Node ID is not valid");
   }
-
-  return node_uuids[node_id.index()];
+  return record->uuid;
 }
 
 NodeID Scene::get_node_by_uuid(const UUID uuid) const {
@@ -98,16 +71,16 @@ NodeID Scene::get_node_by_uuid(const UUID uuid) const {
     return NodeID::INVALID;
   }
 
-  NodeID new_id = generate_id();
+  NodeID new_id = nodes.insert(NodeRecord{
+    .type = std::string(node_type),
+    .uuid = uuid
+  });
   if (new_id == NodeID::INVALID) {
     return NodeID::INVALID;
   }
-
-  const uint32_t index = new_id.index();
-  nodes[index].id = new_id;
-  nodes[index].parent_id = NodeID::INVALID;
-  node_types[index] = node_type;
-  node_uuids[index] = uuid;
+  NodeRecord& record = *nodes.get(new_id);
+  record.node.id = new_id;
+  record.node.parent_id = NodeID::INVALID;
   uuid_to_node_id[uuid] = new_id;
 
   for (auto& manager : managers_flat_array) {
@@ -129,23 +102,16 @@ NodeID Scene::get_node_by_uuid(const UUID uuid) const {
 }
 
 void Scene::destroy_node(NodeID node_id) {
-  if (!is_node_valid(node_id)) return;
+  NodeRecord* record = nodes.get(node_id);
+  if (!record) return;
 
-  Node* node = &nodes[node_id.index()];
-  if (!node) {
-    std::cerr << "Node with provided ID not found";
-    return;
+  const NodeID parent_id = record->node.parent_id;
+  if (NodeRecord* parent = nodes.get(parent_id)) {
+    auto& siblings = parent->node.children_ids;
+    siblings.erase(std::remove(siblings.begin(), siblings.end(), node_id), siblings.end());
   }
 
-  if (node->parent_id != NodeID::INVALID) {
-    Node* parent = &nodes[node->parent_id.index()];
-    if (parent) {
-      auto& siblings = parent->children_ids;
-      siblings.erase(std::remove(siblings.begin(), siblings.end(), node_id), siblings.end());
-    }
-  }
-
-  std::vector<NodeID> children_to_kill = node->children_ids;
+  std::vector<NodeID> children_to_kill = record->node.children_ids;
   for (NodeID child_id : children_to_kill) {
     destroy_node(child_id);
   }
@@ -154,18 +120,10 @@ void Scene::destroy_node(NodeID node_id) {
     manager->on_node_destroyed(node_id);
   }
 
-  uint32_t idx = node_id.index();
-
-  generations[idx]++;
-
-  recycled_ids.push_back(idx);
-
-  node->id = NodeID::INVALID;
-  node->parent_id = NodeID::INVALID;
-  node->children_ids.clear();
-
-  UUID dead_uuid = node_uuids[node_id.index()];
-  uuid_to_node_id.erase(dead_uuid);
+  std::optional<NodeRecord> dead = nodes.erase(node_id);
+  if (dead) {
+    uuid_to_node_id.erase(dead->uuid);
+  }
 }
 
 void Scene::clear_nodes() {
@@ -173,15 +131,8 @@ void Scene::clear_nodes() {
     manager->on_scene_clear();
   }
 
-  for (uint32_t i = 0; i < get_highest_allocated_node_index(); ++i) {
-    generations[i]++; // Invalidates all existing handles globally
-    nodes[i].id = NodeID::INVALID;
-    nodes[i].parent_id = NodeID::INVALID;
-    nodes[i].children_ids.clear();
-  }
-
-  recycled_ids.clear();
-  next_unused_id.store(0);
+  nodes.clear();
+  uuid_to_node_id.clear();
 }
 
 void Scene::reparent_node(NodeID node_id, NodeID new_parent_id) {
@@ -200,31 +151,13 @@ void Scene::reparent_node(NodeID node_id, NodeID new_parent_id) {
     return;
   }
 
-  if (node_id == new_parent_id) {
-    std::cerr << "Cannot parent a node to itself.";
-    return;
-  }
-
-  Node* child = &nodes[node_id.index()];
-  Node* new_parent = &nodes[new_parent_id.index()];
-
-  if (!child) {
-    std::cerr << "Node with provided ID not found";
-    return;
-  }
-
-  if (!new_parent) {
-    std::cerr << "Parent node with provided ID not found";
-    return;
-  }
+  Node* child = &nodes.get(node_id)->node;
+  Node* new_parent = &nodes.get(new_parent_id)->node;
 
   NodeID old_parent_id = child->parent_id;
-  if (child->parent_id != NodeID::INVALID) {
-    Node* old_parent = &nodes[child->parent_id.index()];
-    if (old_parent) {
-      auto& siblings = old_parent->children_ids;
-      siblings.erase(std::remove(siblings.begin(), siblings.end(), node_id), siblings.end());
-    }
+  if (NodeRecord* old_parent = nodes.get(old_parent_id)) {
+    auto& siblings = old_parent->node.children_ids;
+    siblings.erase(std::remove(siblings.begin(), siblings.end(), node_id), siblings.end());
   }
 
   child->parent_id = new_parent_id;
