@@ -29,11 +29,11 @@ add_library(MoleOSAL STATIC)
 
 target_sources(MoleOSAL
         PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/osal/windowing/glfw/glfw_window.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/osal/windowing/glfw/glfw_window.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/osal/windowing/glfw_window.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/osal/windowing/glfw_window.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/osal/windowing/iwindow.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/osal/inputs/glfw/glfw_inputs.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/osal/inputs/glfw/glfw_inputs.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/osal/inputs/glfw_inputs.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/osal/inputs/glfw_inputs.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/osal/file_system/ifile_system.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/osal/file_system/windows_file_system.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/osal/file_system/windows_file_system.hpp

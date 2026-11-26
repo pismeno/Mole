@@ -1,7 +1,7 @@
 #include "editor/iim_gui_bridge.hpp"
 
 #if defined(MOLE_PLATFORM_WINDOWS)
-#include "im_gui_bridge/win32_vulkan_im_gui_bridge.hpp"
+#include "win32_vulkan_im_gui_bridge.hpp"
 #endif
 #include "utils/result.hpp"
 

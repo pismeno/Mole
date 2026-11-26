@@ -3,7 +3,7 @@
 #include <memory>
 #include <utility>
 
-#include "osal/windowing/glfw/glfw_window.hpp"
+#include "osal/windowing/glfw_window.hpp"
 #include "utils/result.hpp"
 
 namespace mole {

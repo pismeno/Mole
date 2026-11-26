@@ -38,7 +38,7 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/states/workspace_state.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/process_orchestrator.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/project_asset_pipeline.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/iim_gui_bridge.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/im_gui_bridge/iim_gui_bridge.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/im_gui_bridge/win32_vulkan_im_gui_bridge.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/im_gui_bridge/win32_vulkan_im_gui_bridge.hpp
 )

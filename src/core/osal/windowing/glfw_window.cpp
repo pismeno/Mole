@@ -4,7 +4,7 @@
 #define GLFW_EXPOSE_NATIVE_COCOA
 #endif
 
-#include "osal/windowing/glfw/glfw_window.hpp"
+#include "osal/windowing/glfw_window.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -13,7 +13,7 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
-#include "osal/inputs/glfw/glfw_inputs.hpp"
+#include "osal/inputs/glfw_inputs.hpp"
 #include "utils/result.hpp"
 
 namespace mole {

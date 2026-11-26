@@ -147,7 +147,7 @@ Result<void> WorkspaceState::render_game_viewport() {
 
   PassOptions pass_options{
     .view_data = calculate_view_data(static_cast<float>(width), static_cast<float>(height)),
-    .clear_color = glm::vec4(0.0f, 1.0f, 0.5f, 1.0f)
+    .clear_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)
   };
 
   MOLE_TRY_ASSIGN(bool pass_open, renderer->begin_pass(viewport_target, pass_options));

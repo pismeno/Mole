@@ -1,10 +1,10 @@
-#include "osal/inputs/glfw/glfw_inputs.hpp"
+#include "osal/inputs/glfw_inputs.hpp"
 
 #include <cstdint>
 
 #include <GLFW/glfw3.h>
 
-#include "osal/windowing/glfw/glfw_window.hpp"
+#include "osal/windowing/glfw_window.hpp"
 
 namespace mole {
 

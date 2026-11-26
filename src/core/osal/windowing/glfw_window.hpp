@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <string>
 
-#include "osal/inputs/glfw/glfw_inputs.hpp"
+#include "osal/inputs/glfw_inputs.hpp"
 #include "utils/result.hpp"
 
 struct GLFWwindow;
