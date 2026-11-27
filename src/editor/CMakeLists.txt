@@ -28,6 +28,8 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/process_orchestrator.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/project_asset_pipeline.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/iim_gui_bridge.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/icommand.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/editor/command_history.hpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/editor.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
@@ -38,6 +40,7 @@ target_sources(MoleEditor
         ${CMAKE_CURRENT_SOURCE_DIR}/states/workspace_state.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/process_orchestrator.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/project_asset_pipeline.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/command_history.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/im_gui_bridge/iim_gui_bridge.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/im_gui_bridge/win32_vulkan_im_gui_bridge.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/im_gui_bridge/win32_vulkan_im_gui_bridge.hpp

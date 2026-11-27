@@ -9,6 +9,7 @@ struct ResourcesContext;
 
 class ProcessOrchestrator;
 class IImGuiBridge;
+class CommandHistory;
 
 /**
  * @brief Context for the editor Application layer.
@@ -21,6 +22,7 @@ struct EditorContext {
 
   ProcessOrchestrator* process_orchestrator;
   IImGuiBridge* im_gui_bridge;
+  CommandHistory* command_history;
 };
 
 } // mole

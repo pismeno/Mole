@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "editor/command_history.hpp"
 #include "editor/editor_context.hpp"
 #include "node_system/engine_managers.hpp"
 #include "node_system/manager_reflector_binder_factory.hpp"
@@ -31,6 +32,7 @@ class ProcessOrchestrator;
 class RenderGatherer;
 class Scene;
 class SceneFactory;
+class CommandHistory;
 
 class Editor {
 public:
@@ -53,7 +55,6 @@ private:
   Result<void> init_rendering_context();
   Result<void> init_node_system_context();
   Result<void> init_editor_context();
-  Result<void> init_imgui();
 
   Result<void> load_workspace();
 
@@ -78,6 +79,7 @@ private:
   std::unique_ptr<ProcessOrchestrator> process_orchestrator;
   std::unique_ptr<ManagerReflectorBinderFactory<EngineManagers>> manager_reflector_binder_factory;
   std::unique_ptr<IImGuiBridge> im_gui_bridge;
+  std::unique_ptr<CommandHistory> command_history;
   
   std::unique_ptr<IEditorState> state;
 

@@ -6,6 +6,7 @@
 #include <thread>
 #include <utility>
 
+#include "editor/command_history.hpp"
 #include "editor/editor_context.hpp"
 #include "editor/iim_gui_bridge.hpp"
 #include "editor/process_orchestrator.hpp"
@@ -51,7 +52,6 @@ Result<std::unique_ptr<Editor>> Editor::create() {
   MOLE_TRY(editor->init_node_system_context());
   MOLE_TRY(editor->init_rendering_context());
   MOLE_TRY(editor->init_editor_context());
-  MOLE_TRY(editor->init_imgui());
 
   editor->scene_factory->register_managers<EngineManagers>();
 
@@ -142,6 +142,7 @@ Result<void> Editor::init_rendering_context() {
 
 Result<void> Editor::init_editor_context() {
   process_orchestrator = std::make_unique<ProcessOrchestrator>();
+  command_history = std::make_unique<CommandHistory>();
 
   context = {
       .node_system_context = &node_system_context,
@@ -150,18 +151,14 @@ Result<void> Editor::init_editor_context() {
       .resources_context = &resources_context,
 
       .process_orchestrator = process_orchestrator.get(),
+      .command_history = command_history.get()
   };
 
-  return mole::ok();
-}
-
-Result<void> Editor::init_imgui() {
   ImGuiBridgeOptions bridge_options{
     .renderer_type = ERendererType::Vulkan,
     .native_window_handle = window->get_native_handle(),
     .presenter = main_presenter
   };
-
   MOLE_TRY_ASSIGN(im_gui_bridge, IImGuiBridge::create(bridge_options, context));
   context.im_gui_bridge = im_gui_bridge.get();
 
