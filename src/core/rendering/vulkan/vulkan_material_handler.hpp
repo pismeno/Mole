@@ -9,6 +9,7 @@
 #include <vk_mem_alloc_raii.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
+#include "rendering/material_buffer_allocator.hpp"
 #include "resources/asset_handle.hpp"
 #include "resources/asset_types.hpp"
 #include "resources/material_types.hpp"
@@ -28,8 +29,8 @@ struct RenderingContext;
 
 class VulkanMaterialHandler {
 public:
-  static inline constexpr size_t MATERIAL_STRIDE = 128;
-  static inline constexpr size_t MAX_MATERIALS = 1000;
+  static inline constexpr size_t MATERIAL_BUFFER_SIZE = 128 * 1000;
+  static inline constexpr size_t MAX_MATERIAL_SIZE = 128;
   static inline constexpr uint64_t FREE_MATERIAL_AFTER_FRAMES = 144 * 60;
 
   ~VulkanMaterialHandler() = default;
@@ -63,7 +64,8 @@ private:
   };
 
   struct GpuMaterial {
-    uint32_t slot_index;
+    uint32_t byte_offset;
+    uint32_t byte_size;
     uint32_t shader_index;
     uint64_t last_used_on_frame;
     uint32_t version;
@@ -97,8 +99,6 @@ private:
   Result<void> upload_material(const MaterialID& material_id);
   Result<void> update_material(const MaterialID& material_id);
 
-  uint32_t make_material_index();
-
   void add_texture_reference(uint64_t texture_id);
   void remove_texture_reference(uint64_t texture_id);
 
@@ -120,8 +120,7 @@ private:
   std::unordered_map<uint64_t, uint32_t> texture_ref_counts;
 
   std::unordered_map<MaterialID, GpuMaterial> allocated_materials;
-  std::vector<uint32_t> recycled_material_indices;
-  uint32_t next_unused_material_index{0};
+  MaterialBufferAllocator material_allocator;
 
   const Counter& frames_rendered;
   const VulkanContext& vk_context;

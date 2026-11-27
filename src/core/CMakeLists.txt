@@ -163,6 +163,7 @@ target_sources(MoleRendering
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/material_shader_layout_reflector.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/packed_material_cache.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/material_packer.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rendering/material_buffer_allocator.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/material_shader_layout_registry.cpp
 
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/renderer_types.hpp
@@ -173,6 +174,7 @@ target_sources(MoleRendering
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/material_shader_layout_registry.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/packed_material_cache.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/material_packer.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/material_buffer_allocator.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/metal/texture.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rendering/include/rendering/vertex.hpp
 )

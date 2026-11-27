@@ -37,14 +37,15 @@ namespace mole {
 
 VulkanMaterialHandler::VulkanMaterialHandler(const VulkanContext& vk_context,
                                              const VulkanMemoryAllocator& memory_allocator,
-                                             const Counter& frames_rendered, const RenderingContext& context)
-    : frames_rendered(frames_rendered),
-      vk_context(vk_context),
-      memory_allocator(memory_allocator),
-      bindless_texture_registry(context.bindless_texture_registry),
-      material_pool(context.resources_context->material_pool),
-      asset_manager(context.resources_context->asset_manager),
-      packed_material_cache(context.packed_material_cache) {}
+                                             const Counter& frames_rendered, const RenderingContext& context) : 
+  material_allocator(MATERIAL_BUFFER_SIZE),
+  frames_rendered(frames_rendered),
+  vk_context(vk_context),
+  memory_allocator(memory_allocator),
+  bindless_texture_registry(context.bindless_texture_registry),
+  material_pool(context.resources_context->material_pool),
+  asset_manager(context.resources_context->asset_manager),
+  packed_material_cache(context.packed_material_cache) {}
 
 Result<std::unique_ptr<VulkanMaterialHandler>> VulkanMaterialHandler::create(const VulkanContext& vk_context,
                                                                              VulkanMemoryAllocator& memory_allocator,
@@ -143,14 +144,16 @@ Result<void> VulkanMaterialHandler::create_descriptor_set() {
 }
 
 Result<void> VulkanMaterialHandler::create_default_sampler() {
-  vk::SamplerCreateInfo sampler_info{.magFilter = vk::Filter::eLinear,
-                                     .minFilter = vk::Filter::eLinear,
-                                     .mipmapMode = vk::SamplerMipmapMode::eLinear,
-                                     .addressModeU = vk::SamplerAddressMode::eRepeat,
-                                     .addressModeV = vk::SamplerAddressMode::eRepeat,
-                                     .addressModeW = vk::SamplerAddressMode::eRepeat,
-                                     .maxAnisotropy = 1.0f,
-                                     .borderColor = vk::BorderColor::eIntOpaqueBlack};
+  vk::SamplerCreateInfo sampler_info{
+    .magFilter = vk::Filter::eLinear,
+    .minFilter = vk::Filter::eLinear,
+    .mipmapMode = vk::SamplerMipmapMode::eLinear,
+    .addressModeU = vk::SamplerAddressMode::eRepeat,
+    .addressModeV = vk::SamplerAddressMode::eRepeat,
+    .addressModeW = vk::SamplerAddressMode::eRepeat,
+    .maxAnisotropy = 1.0f,
+    .borderColor = vk::BorderColor::eIntOpaqueBlack
+  };
 
   auto vkr_sampler = vk_context.get_logical_device().createSampler(sampler_info);
   if (vkr_sampler.result != vk::Result::eSuccess) {
@@ -173,7 +176,7 @@ Result<void> VulkanMaterialHandler::create_command_pool() {
 }
 
 Result<void> VulkanMaterialHandler::create_material_buffer() {
-  size_t total_buffer_size = MAX_MATERIALS * MATERIAL_STRIDE;
+  size_t total_buffer_size = MATERIAL_BUFFER_SIZE;
 
   auto r_buf = memory_allocator.create_buffer(vk::BufferUsageFlagBits::eStorageBuffer, total_buffer_size);
   if (!r_buf) return mole::fail(r_buf.error());
@@ -184,12 +187,14 @@ Result<void> VulkanMaterialHandler::create_material_buffer() {
   // 2. Link this buffer to Binding 1 in our Descriptor Set
   vk::DescriptorBufferInfo buffer_info{.buffer = *material_buffer, .offset = 0, .range = total_buffer_size};
 
-  vk::WriteDescriptorSet write_desc{.dstSet = *descriptor_set,
-                                    .dstBinding = 1, // <--- Matches the shader!
-                                    .dstArrayElement = 0,
-                                    .descriptorCount = 1,
-                                    .descriptorType = vk::DescriptorType::eStorageBuffer,
-                                    .pBufferInfo = &buffer_info};
+  vk::WriteDescriptorSet write_desc{
+    .dstSet = *descriptor_set,
+    .dstBinding = 1, // <--- Matches the shader!
+    .dstArrayElement = 0,
+    .descriptorCount = 1,
+    .descriptorType = vk::DescriptorType::eStorageBuffer,
+    .pBufferInfo = &buffer_info
+  };
 
   vk_context.get_logical_device().updateDescriptorSets(write_desc, nullptr);
 
@@ -258,50 +263,65 @@ Result<void> VulkanMaterialHandler::upload_textures_to_gpu(const std::vector<Tex
     vk::raii::ImageView gpu_view = std::move(r_gpu_view).value();
 
     pre_copy_barriers.push_back(vk::ImageMemoryBarrier2{
-        .srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
-        .srcAccessMask = {},
-        .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
-        .dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
-        .oldLayout = vk::ImageLayout::eUndefined,
-        .newLayout = vk::ImageLayout::eTransferDstOptimal,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = *gpu_image,
-        .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = 1}});
+      .srcStageMask = vk::PipelineStageFlagBits2::eTopOfPipe,
+      .srcAccessMask = {},
+      .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
+      .dstAccessMask = vk::AccessFlagBits2::eTransferWrite,
+      .oldLayout = vk::ImageLayout::eUndefined,
+      .newLayout = vk::ImageLayout::eTransferDstOptimal,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image = *gpu_image,
+      .subresourceRange = {
+        .aspectMask = vk::ImageAspectFlagBits::eColor, 
+        .levelCount = 1, 
+        .layerCount = 1
+      }
+    });
 
     post_copy_barriers.push_back(vk::ImageMemoryBarrier2{
-        .srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
-        .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
-        .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
-        .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
-        .oldLayout = vk::ImageLayout::eTransferDstOptimal,
-        .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = *gpu_image,
-        .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = 1}});
+      .srcStageMask = vk::PipelineStageFlagBits2::eTransfer,
+      .srcAccessMask = vk::AccessFlagBits2::eTransferWrite,
+      .dstStageMask = vk::PipelineStageFlagBits2::eFragmentShader,
+      .dstAccessMask = vk::AccessFlagBits2::eShaderRead,
+      .oldLayout = vk::ImageLayout::eTransferDstOptimal,
+      .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image = *gpu_image,
+      .subresourceRange = {
+        .aspectMask = vk::ImageAspectFlagBits::eColor, 
+        .levelCount = 1, 
+        .layerCount = 1
+      }
+    });
 
     descriptor_image_infos.push_back(
         {.sampler = *default_sampler, .imageView = *gpu_view, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal});
 
-    descriptor_writes.push_back({.dstSet = *descriptor_set,
-                                 .dstBinding = 0,
-                                 .dstArrayElement = slot,
-                                 .descriptorCount = 1,
-                                 .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                 .pImageInfo = &descriptor_image_infos.back()});
+    descriptor_writes.push_back({
+      .dstSet = *descriptor_set,
+      .dstBinding = 0,
+      .dstArrayElement = slot,
+      .descriptorCount = 1,
+      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+      .pImageInfo = &descriptor_image_infos.back()
+    });
 
     // Store the newly created texture in the registry
-    allocated_textures[slot] = GpuTexture{.asset_uuid = asset.get_uuid(),
-                                          .image = std::move(gpu_image),
-                                          .view = std::move(gpu_view),
-                                          .version = asset_manager->get_version(asset.get_uuid())};
+    allocated_textures[slot] = GpuTexture{
+      .asset_uuid = asset.get_uuid(),
+      .image = std::move(gpu_image),
+      .view = std::move(gpu_view),
+      .version = asset_manager->get_version(asset.get_uuid())
+    };
   }
 
   // 5. Batch-record barriers and copies
-  cmd_buffer.pipelineBarrier2(
-      vk::DependencyInfo{.imageMemoryBarrierCount = static_cast<uint32_t>(pre_copy_barriers.size()),
-                         .pImageMemoryBarriers = pre_copy_barriers.data()});
+  cmd_buffer.pipelineBarrier2(vk::DependencyInfo{
+      .imageMemoryBarrierCount = static_cast<uint32_t>(pre_copy_barriers.size()),
+      .pImageMemoryBarriers = pre_copy_barriers.data()
+    });
 
   for (size_t i = 0; i < uploads.size(); ++i) {
     vk::BufferImageCopy copy_region{
@@ -313,9 +333,10 @@ Result<void> VulkanMaterialHandler::upload_textures_to_gpu(const std::vector<Tex
                                  vk::ImageLayout::eTransferDstOptimal, copy_region);
   }
 
-  cmd_buffer.pipelineBarrier2(
-      vk::DependencyInfo{.imageMemoryBarrierCount = static_cast<uint32_t>(post_copy_barriers.size()),
-                         .pImageMemoryBarriers = post_copy_barriers.data()});
+  cmd_buffer.pipelineBarrier2(vk::DependencyInfo{
+    .imageMemoryBarrierCount = static_cast<uint32_t>(post_copy_barriers.size()),
+    .pImageMemoryBarriers = post_copy_barriers.data()
+  });
 
   // 6. Submit and wait
   if (cmd_buffer.end() != vk::Result::eSuccess) return mole::fail("Failed to end upload command buffer");
@@ -397,19 +418,22 @@ Result<vk::raii::CommandBuffer> VulkanMaterialHandler::allocate_upload_command_b
 
 Result<vma::raii::Image> VulkanMaterialHandler::create_texture_image(const AssetHandle<ImageAsset>& asset) {
   vk::ImageCreateInfo image_info{
-      .imageType = vk::ImageType::e2D,
-      .format = vk::Format::eR8G8B8A8Srgb,
-      .extent = {static_cast<uint32_t>(asset->width), static_cast<uint32_t>(asset->height), 1},
-      .mipLevels = 1,
-      .arrayLayers = 1,
-      .samples = vk::SampleCountFlagBits::e1,
-      .tiling = vk::ImageTiling::eOptimal,
-      .usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-      .sharingMode = vk::SharingMode::eExclusive,
-      .initialLayout = vk::ImageLayout::eUndefined};
+    .imageType = vk::ImageType::e2D,
+    .format = vk::Format::eR8G8B8A8Srgb,
+    .extent = {static_cast<uint32_t>(asset->width), static_cast<uint32_t>(asset->height), 1},
+    .mipLevels = 1,
+    .arrayLayers = 1,
+    .samples = vk::SampleCountFlagBits::e1,
+    .tiling = vk::ImageTiling::eOptimal,
+    .usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+    .sharingMode = vk::SharingMode::eExclusive,
+    .initialLayout = vk::ImageLayout::eUndefined
+  };
 
-  vma::AllocationCreateInfo alloc_info{.flags = vma::AllocationCreateFlagBits::eDedicatedMemory,
-                                       .usage = vma::MemoryUsage::eAuto};
+  vma::AllocationCreateInfo alloc_info{
+    .flags = vma::AllocationCreateFlagBits::eDedicatedMemory,
+    .usage = vma::MemoryUsage::eAuto
+  };
 
   auto vkr = memory_allocator.get_allocator().createImage(image_info, alloc_info);
   if (vkr.result != vk::Result::eSuccess) return mole::fail("Failed to create GPU texture image");
@@ -418,10 +442,14 @@ Result<vma::raii::Image> VulkanMaterialHandler::create_texture_image(const Asset
 
 Result<vk::raii::ImageView> VulkanMaterialHandler::create_texture_image_view(vk::Image image) {
   vk::ImageViewCreateInfo view_info{
-      .image = image,
-      .viewType = vk::ImageViewType::e2D,
-      .format = vk::Format::eR8G8B8A8Srgb,
-      .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = 1}};
+    .image = image,
+    .viewType = vk::ImageViewType::e2D,
+    .format = vk::Format::eR8G8B8A8Srgb,
+    .subresourceRange = {
+      .aspectMask = vk::ImageAspectFlagBits::eColor, 
+      .levelCount = 1, .layerCount = 1
+    }
+  };
   auto vkr = vk_context.get_logical_device().createImageView(view_info);
   if (vkr.result != vk::Result::eSuccess) return mole::fail("Failed to create texture image view");
   return std::move(vkr.value);
@@ -499,31 +527,32 @@ Result<void> VulkanMaterialHandler::upload_material(const MaterialID& material_i
 
   if (packed_material.data.empty()) return mole::ok();
 
-  if (packed_material.data.size() > MATERIAL_STRIDE) {
+  if (packed_material.data.size() > MAX_MATERIAL_SIZE) {
     return mole::fail("Packed material data is too large for VulkanMaterialHandler, it exceeds " +
-                      std::to_string(MATERIAL_STRIDE) + " bytes");
+                      std::to_string(MAX_MATERIAL_SIZE) + " bytes");
   }
 
-  uint32_t slot_index = make_material_index();
-  uint32_t shader_index =
-      (slot_index * static_cast<uint32_t>(MATERIAL_STRIDE)) / static_cast<uint32_t>(packed_material.data.size());
+  uint32_t byte_size = static_cast<uint32_t>(packed_material.data.size());
+  MOLE_TRY_ASSIGN(uint32_t byte_offset, material_allocator.allocate(byte_size));
+  uint32_t shader_index = byte_offset / byte_size;
 
   auto r_version = material_pool->get_version(material_id);
   auto r_vert = material_pool->get_vertex_shader(material_id);
   auto r_frag = material_pool->get_fragment_shader(material_id);
 
   // Store slot, shader index, frame count, version, and texture references in the map!
-  allocated_materials[material_id] = {.slot_index = slot_index,
-                                      .shader_index = shader_index,
-                                      .last_used_on_frame = frames_rendered.count,
-                                      .version = r_version ? r_version.value() : 0,
-                                      .vert_shader_version = r_vert ? r_vert.value().get_version() : 0,
-                                      .frag_shader_version = r_frag ? r_frag.value().get_version() : 0,
-                                      .texture_ids = std::move(texture_ids)};
+  allocated_materials[material_id] = {
+    .byte_offset = byte_offset,
+    .byte_size = byte_size,
+    .shader_index = shader_index,
+    .last_used_on_frame = frames_rendered.count,
+    .version = r_version ? r_version.value() : 0,
+    .vert_shader_version = r_vert ? r_vert.value().get_version() : 0,
+    .frag_shader_version = r_frag ? r_frag.value().get_version() : 0,
+    .texture_ids = std::move(texture_ids)
+  };
 
-  std::byte* target_address = gpu_dest + (slot_index * MATERIAL_STRIDE);
-  std::memset(target_address, 0, MATERIAL_STRIDE);
-  std::memcpy(target_address, packed_material.data.data(), packed_material.data.size());
+  std::memcpy(gpu_dest + byte_offset, packed_material.data.data(), packed_material.data.size());
 
   return mole::ok();
 }
@@ -536,7 +565,6 @@ Result<void> VulkanMaterialHandler::update_material(const MaterialID& material_i
     return mole::fail("Material ID not found in allocated materials for update");
   }
   GpuMaterial& gpu_material = it->second;
-  uint32_t slot_index = gpu_material.slot_index;
 
   std::vector<uint64_t> new_texture_ids;
   auto r_with = material_pool->with_material(material_id, [&](const Material& material) {
@@ -564,13 +592,27 @@ Result<void> VulkanMaterialHandler::update_material(const MaterialID& material_i
 
   if (packed_material.data.empty()) return mole::ok();
 
-  if (packed_material.data.size() > MATERIAL_STRIDE) {
+  if (packed_material.data.size() > MAX_MATERIAL_SIZE) {
     return mole::fail("Packed material data is too large for VulkanMaterialHandler, it exceeds " +
-                      std::to_string(MATERIAL_STRIDE) + " bytes");
+                      std::to_string(MAX_MATERIAL_SIZE) + " bytes");
   }
 
-  uint32_t shader_index =
-      (slot_index * static_cast<uint32_t>(MATERIAL_STRIDE)) / static_cast<uint32_t>(packed_material.data.size());
+  uint32_t byte_size = static_cast<uint32_t>(packed_material.data.size());
+  if (byte_size != gpu_material.byte_size) {
+    // Struct size changed (e.g. shader hot reload): move to a range aligned to the new size.
+    material_allocator.free(gpu_material.byte_offset, gpu_material.byte_size);
+    auto r_offset = material_allocator.allocate(byte_size);
+    if (!r_offset) {
+      for (uint64_t tex_id : gpu_material.texture_ids) {
+        remove_texture_reference(tex_id);
+      }
+      allocated_materials.erase(it);
+      return mole::fail(r_offset.error());
+    }
+    gpu_material.byte_offset = r_offset.value();
+    gpu_material.byte_size = byte_size;
+  }
+  uint32_t shader_index = gpu_material.byte_offset / byte_size;
 
   auto r_version = material_pool->get_version(material_id);
   auto r_vert = material_pool->get_vertex_shader(material_id);
@@ -582,9 +624,7 @@ Result<void> VulkanMaterialHandler::update_material(const MaterialID& material_i
   gpu_material.vert_shader_version = r_vert ? r_vert.value().get_version() : 0;
   gpu_material.frag_shader_version = r_frag ? r_frag.value().get_version() : 0;
 
-  std::byte* target_address = gpu_dest + (slot_index * MATERIAL_STRIDE);
-  std::memset(target_address, 0, MATERIAL_STRIDE);
-  std::memcpy(target_address, packed_material.data.data(), packed_material.data.size());
+  std::memcpy(gpu_dest + gpu_material.byte_offset, packed_material.data.data(), packed_material.data.size());
 
   return mole::ok();
 }
@@ -605,13 +645,13 @@ void VulkanMaterialHandler::free_unused_materials() {
 void VulkanMaterialHandler::free_material(const MaterialID& material_id) {
   auto it = allocated_materials.find(material_id);
   if (it != allocated_materials.end()) {
-    uint32_t slot_index = it->second.slot_index;
-
     for (uint64_t texture_id : it->second.texture_ids) {
       remove_texture_reference(texture_id);
     }
 
-    recycled_material_indices.push_back(slot_index);
+    if (it->second.byte_size != 0) {
+      material_allocator.free(it->second.byte_offset, it->second.byte_size);
+    }
     allocated_materials.erase(it);
   }
 }
@@ -651,16 +691,4 @@ Result<uint32_t> VulkanMaterialHandler::get_material_index(const MaterialID& mat
   return it->second.shader_index;
 }
 
-uint32_t VulkanMaterialHandler::make_material_index() {
-  uint32_t index;
-  if (!recycled_material_indices.empty()) {
-    index = recycled_material_indices.back();
-    recycled_material_indices.pop_back();
-  } else {
-    index = next_unused_material_index++;
-  }
-
-  return index;
-}
-
-} // namespace mole
+} // mole

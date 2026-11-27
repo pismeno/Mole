@@ -7,6 +7,7 @@ add_executable(MoleTests
         transform_manager_test.cpp
         material_pool_test.cpp
         material_packer_test.cpp
+        material_buffer_allocator_test.cpp
         file_system_test.cpp
         asset_manager_test.cpp
         scene_material_asset_test.cpp
