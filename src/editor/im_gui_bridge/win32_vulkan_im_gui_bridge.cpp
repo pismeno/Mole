@@ -1,4 +1,5 @@
 #include "win32_vulkan_im_gui_bridge.hpp"
+#include <cstddef>
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -21,6 +22,7 @@
 #include "rendering/irenderer.hpp"
 #include "rendering/renderer_types.hpp"
 #include "rendering/rendering_context.hpp"
+#include "osal/os_context.hpp"
 #include "utils/result.hpp"
 
 static_assert(sizeof(ImTextureID) == sizeof(uint64_t));
@@ -75,16 +77,22 @@ Win32VulkanImGuiBridge::~Win32VulkanImGuiBridge() {
 
 Result<std::unique_ptr<Win32VulkanImGuiBridge>> Win32VulkanImGuiBridge::create(const EditorContext& context, void* window_handle, PresenterID presenter) {
   auto bridge = std::unique_ptr<Win32VulkanImGuiBridge>(new Win32VulkanImGuiBridge(context, window_handle, presenter));
-  MOLE_TRY(bridge->init());
+  MOLE_TRY(bridge->init(context.os_context->file_system));
   return bridge;
 }
 
-Result<void> Win32VulkanImGuiBridge::init() {
+Result<void> Win32VulkanImGuiBridge::init(IFileSystem* file_system) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  io.IniFilename = nullptr;
+  
+  auto r_resolve_ini = file_system->resolve("exe://d_imgui.ini");
+  assert(r_resolve_ini);
+  std::filesystem::path ini_path = std::move(r_resolve_ini.value());
+  ImGui::LoadIniSettingsFromDisk(reinterpret_cast<const char*>(ini_path.u8string().c_str()));
 
   ImGui::StyleColorsDark();
 

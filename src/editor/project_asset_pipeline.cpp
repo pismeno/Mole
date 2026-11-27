@@ -44,19 +44,19 @@ void ProjectAssetPipeline::update() {
   std::filesystem::path project_root = project.get_location();
   std::filesystem::path assets_root = project_root / "assets"; // Compare against the assets folder\
 
-  auto r_python_path = file_system->resolve("exe://../../tools/python/python.exe");
+  auto r_python_path = file_system->resolve("exe://python/python.exe");
   if (!r_python_path) {
     std::cerr << "Failed to resolve python interpreter: " << r_python_path.error() << std::endl;
     return;
   }
 
-  auto r_meta_script = file_system->resolve("exe://../../../../src/editor/tools/gen_asset_meta_files.py");
+  auto r_meta_script = file_system->resolve("exe://tools/gen_asset_meta_files.py");
   if (!r_meta_script) {
     std::cerr << "Failed to resolve gen_asset_meta_files.py: " << r_meta_script.error() << std::endl;
     return;
   }
 
-  auto r_cook_script = file_system->resolve("exe://../../../../src/editor/tools/cook_assets.py");
+  auto r_cook_script = file_system->resolve("exe://tools/cook_assets.py");
   if (!r_cook_script) {
     std::cerr << "Failed to resolve cook_assets.py: " << r_cook_script.error() << std::endl;
     return;

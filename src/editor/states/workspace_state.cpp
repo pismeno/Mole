@@ -74,10 +74,10 @@ Result<std::unique_ptr<WorkspaceState>> WorkspaceState::create(std::unique_ptr<P
 
   MOLE_TRY_ASSIGN(state->project_asset_pipeline, ProjectAssetPipeline::create(context, *state->project, *state->project_assets));
 
-  auto r_python_path = file_system->resolve("exe://../../tools/python/python.exe");
+  auto r_python_path = file_system->resolve("exe://python/python.exe");
   if (!r_python_path) return mole::fail("Failed to resolve python interpreter: " + r_python_path.error());
 
-  auto r_sync_script = file_system->resolve("exe://../../../../src/editor/tools/sync_assets.py");
+  auto r_sync_script = file_system->resolve("exe://tools/sync_assets.py");
   if (!r_sync_script) return mole::fail("Failed to resolve sync_assets.py: " + r_sync_script.error());
 
   auto r_spawn_sync = context.process_orchestrator->spawn(

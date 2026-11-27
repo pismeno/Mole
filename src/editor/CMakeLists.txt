@@ -82,4 +82,23 @@ if(APPLE)
     )
 endif()
 
-include(${CMAKE_SOURCE_DIR}/cmake/SetupPython.cmake)
+# Runtime files the editor loads from exe:// (d_imgui.ini, tools/*.py), re-copied whenever they change
+file(GLOB_RECURSE EDITOR_TOOL_SCRIPTS CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/tools/*.py)
+set(EDITOR_RUNTIME_FILES d_imgui.ini ${EDITOR_TOOL_SCRIPTS})
+
+set(EDITOR_RUNTIME_OUTPUTS)
+foreach(file ${EDITOR_RUNTIME_FILES})
+    add_custom_command(
+            OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${file}
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/${file} ${CMAKE_CURRENT_BINARY_DIR}/${file}
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${file}
+            COMMENT "Copying ${file}"
+    )
+    list(APPEND EDITOR_RUNTIME_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/${file})
+endforeach()
+
+add_custom_target(MoleEditorRuntimeFiles DEPENDS ${EDITOR_RUNTIME_OUTPUTS})
+add_dependencies(MoleEditor MoleEditorRuntimeFiles)
+
+# Embedded Python runtime in exe://python/, set up at configure time
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/SetupPython.cmake)

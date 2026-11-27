@@ -2,11 +2,11 @@
 include(FetchContent)
 
 if(WIN32)
-    set(PORTABLE_PYTHON_DIR "${CMAKE_BINARY_DIR}/tools/python")
+    set(PORTABLE_PYTHON_DIR "${CMAKE_CURRENT_BINARY_DIR}/python")
     set(PORTABLE_PYTHON_EXE "${PORTABLE_PYTHON_DIR}/python.exe")
     set(PORTABLE_SITE_PACKAGES "${PORTABLE_PYTHON_DIR}/Lib/site-packages")
     set(PYTHON_SETUP_STAMP "${PORTABLE_PYTHON_DIR}/.setup_done")
-    set(EDITOR_TOOLS_DIR "${CMAKE_SOURCE_DIR}/src/editor/tools")
+    set(EDITOR_TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tools")
     set(EDITOR_TOOLS_REQUIREMENTS "${EDITOR_TOOLS_DIR}/py_requirements.txt")
 
     # Tell CMake to re-run configuration if the requirements file changes
@@ -36,7 +36,7 @@ if(WIN32)
         file(WRITE "${PORTABLE_PYTHON_DIR}/python312._pth"
                 "python312.zip
                 .
-                ${EDITOR_TOOLS_DIR}
+                ../tools
                 # Uncomment to run site.main() automatically
                 #import site
 

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "editor/iim_gui_bridge.hpp"
+#include "osal/ifile_system.hpp"
 #include "rendering/renderer_types.hpp"
 #include "utils/result.hpp"
 
@@ -43,11 +44,10 @@ private:
     VkDescriptorSet descriptor_set;
   };
 
-  Result<void> init();
+  Result<void> init(IFileSystem* file_system);
   void free_retired_textures();
 
-  IRenderer* renderer;
-  void* window_handle;
+    void* window_handle;
   PresenterID presenter;
   uint32_t frames_in_flight;
 
@@ -55,6 +55,8 @@ private:
   std::vector<RetiredTexture> retired_textures;
   uint64_t frame_count = 0;
   uint32_t dockspace_id = 0;
+
+  IRenderer* renderer;
 };
 
 } // mole
